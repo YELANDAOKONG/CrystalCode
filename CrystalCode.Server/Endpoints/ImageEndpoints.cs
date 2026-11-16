@@ -2,6 +2,7 @@ using System.Globalization;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Server.Hosting;
@@ -16,7 +17,7 @@ namespace CrystalCode.Server.Endpoints;
 /// </summary>
 internal static class ImageEndpoints
 {
-    public static void Map(WebApplication app, ServerContext server)
+    public static void Map(IEndpointRouteBuilder app, ServerContext server)
     {
         app.MapPost("/images", async (HttpContext context, CancellationToken token) =>
         {

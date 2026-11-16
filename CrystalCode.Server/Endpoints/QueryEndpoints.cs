@@ -3,6 +3,7 @@ using System.Text.Json;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
@@ -24,7 +25,7 @@ namespace CrystalCode.Server.Endpoints;
 /// </summary>
 internal static class QueryEndpoints
 {
-    public static void Map(WebApplication app, ServerContext server)
+    public static void Map(IEndpointRouteBuilder app, ServerContext server)
     {
         app.MapGet("/sessions", async Task<IResult> (HttpContext context) =>
         {

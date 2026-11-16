@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 
 using CrystalCode.Server.Security;
 
@@ -8,7 +9,7 @@ namespace CrystalCode.Server.Endpoints;
 /// <summary>Event-stream tickets, narrower tokens, and shutdown.</summary>
 internal static class AuthEndpoints
 {
-    public static void Map(WebApplication app, ServerContext server)
+    public static void Map(IEndpointRouteBuilder app, ServerContext server)
     {
         app.MapPost("/auth/ticket", (HttpContext context) =>
         {

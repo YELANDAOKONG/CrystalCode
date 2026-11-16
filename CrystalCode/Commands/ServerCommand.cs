@@ -69,6 +69,7 @@ public sealed class ServerCommand : AsyncCommand<ServerSettings>
                 settings.Resume.Value),
             Listen = settings.Listen ?? ServerOptions.DefaultListen,
             Socket = settings.Socket,
+            ApiBase = settings.ApiBase ?? configured.ApiBase,
             TlsCertificate = settings.TlsCert,
             TlsKey = settings.TlsKey,
             Token = token,

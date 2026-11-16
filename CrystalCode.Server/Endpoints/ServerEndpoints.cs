@@ -37,7 +37,7 @@ public static class ServerEndpoints
         "GET /pursue/configuration", "PUT /pursue/limits/{name}"
     ];
 
-    public static void Map(WebApplication app, ServerContext server)
+    public static void Map(IEndpointRouteBuilder app, ServerContext server)
     {
         ArgumentNullException.ThrowIfNull(app);
         ArgumentNullException.ThrowIfNull(server);

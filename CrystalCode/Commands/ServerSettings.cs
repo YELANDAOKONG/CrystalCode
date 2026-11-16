@@ -24,6 +24,9 @@ public sealed class ServerSettings : SessionLaunchSettings
     [CommandOption("--socket <PATH>")]
     public string? Socket { get; init; }
 
+    [CommandOption("--api-base <PATH>")]
+    public string? ApiBase { get; init; }
+
     [CommandOption("--tls-cert <PATH>")]
     public string? TlsCert { get; init; }
 

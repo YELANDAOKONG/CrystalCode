@@ -24,6 +24,7 @@ internal sealed class ServerDiscovery
         CrystalHome home,
         string url,
         string workspace,
+        string apiBase,
         string? token,
         Action<Utf8JsonWriter> build)
     {
@@ -53,6 +54,11 @@ internal sealed class ServerDiscovery
             writer.WriteString("url", url);
             writer.WriteNumber("pid", Environment.ProcessId);
             writer.WriteString("workspace", workspace);
+            if (apiBase.Length > 0)
+            {
+                writer.WriteString("apiBase", apiBase);
+            }
+
             if (token is not null)
             {
                 writer.WriteString("token", token);

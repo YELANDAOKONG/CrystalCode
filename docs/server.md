@@ -72,7 +72,7 @@ client by accident.
 
 ```text
 crystal server [session launch options] [-w|--workspace <PATH>] [-r|--resume [TARGET]]
-               [--listen <HOST:PORT>] [--socket <PATH>]
+               [--listen <HOST:PORT>] [--socket <PATH>] [--api-base <PATH>]
                [--tls-cert <PATH> --tls-key <PATH>]
                [--auth token|none] [--token-file <PATH>] [--token-stdin]
                [--allow-host <HOST>]... [--allow-origin <ORIGIN>]...
@@ -88,6 +88,15 @@ crystal server [session launch options] [-w|--workspace <PATH>] [-r|--resume [TA
   interface.
 - `--socket` listens on a Unix domain socket with mode `0600` instead of TCP.
   It cannot be combined with TLS.
+- `--api-base <PATH>` (or `server.apiBase`) serves every route under a path
+  prefix, so `GET /health` becomes `GET <PATH>/health`. The value is `/` or an
+  absolute path such as `/api`; a trailing slash is dropped, and a query,
+  fragment, empty segment, `.` or `..` segment, or any of `{ } % * \` is
+  rejected. It defaults to `/`. The command-line value replaces the config
+  value. Paths outside the prefix return 404, so the root stays free for
+  other content. The prefix is not part of `url`; the `listening` line, the
+  discovery file, and the startup summary add `apiBase` when it is set. All
+  routes in this document are written relative to it.
 - `--space` uses the operator space, as on `crystal run`, and cannot be
   combined with `--workspace`.
 - `--exit-on-stdin-close` ends the server when the wrapper closes stdin. It
@@ -210,7 +219,8 @@ and the `server.state` event.
   route. It needs no token.
 - `config.json` may hold the same lists under `server`: `allowOrigins`,
   `allowHosts`, `exposeHeaders`, and `allowPrivateNetwork`. Command-line
-  values are added to the config values. Invalid entries stop startup.
+  values are added to the config values. `server.apiBase` is a single value
+  and the command line replaces it. Invalid entries stop startup.
 - Twenty failed authentications from one address within a minute return 429
   for the rest of that minute. JSON bodies are limited to 1 MiB; image
   uploads keep the 20 MiB host limit.

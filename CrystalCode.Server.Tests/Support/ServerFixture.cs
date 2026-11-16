@@ -60,7 +60,8 @@ internal sealed class ServerFixture : IAsyncDisposable
         IReadOnlyList<string>? origins = null,
         IReadOnlyList<string>? exposedHeaders = null,
         bool allowPrivateNetwork = false,
-        Action<PluginRegistry>? configurePlugins = null)
+        Action<PluginRegistry>? configurePlugins = null,
+        string apiBase = "")
     {
         var fixture = new ServerFixture(Directory.CreateTempSubdirectory("crystal-server-").FullName);
         var home = new CrystalHome(fixture.Home);
@@ -92,6 +93,7 @@ internal sealed class ServerFixture : IAsyncDisposable
             AllowedOrigins = origins ?? [],
             ExposedHeaders = exposedHeaders ?? [],
             AllowPrivateNetwork = allowPrivateNetwork,
+            ApiBase = apiBase,
             Heartbeat = TimeSpan.FromSeconds(1),
             WriteDiscovery = true
         };

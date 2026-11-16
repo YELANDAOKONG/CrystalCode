@@ -35,6 +35,8 @@ public sealed class AccessGuard
     private readonly bool _allowPrivateNetwork;
     private readonly ConcurrentDictionary<string, Failures> _failures = new(StringComparer.Ordinal);
     private readonly TimeProvider _time;
+    private readonly string _healthPath;
+    private readonly string _eventsPath;
 
     public AccessGuard(
         TokenStore? tokens,
@@ -42,7 +44,8 @@ public sealed class AccessGuard
         IEnumerable<string> origins,
         IEnumerable<string>? exposedHeaders = null,
         bool allowPrivateNetwork = false,
-        TimeProvider? time = null)
+        TimeProvider? time = null,
+        string apiBase = "")
     {
         ArgumentNullException.ThrowIfNull(hosts);
         ArgumentNullException.ThrowIfNull(origins);
@@ -62,6 +65,8 @@ public sealed class AccessGuard
                 .Distinct(StringComparer.OrdinalIgnoreCase));
         _allowPrivateNetwork = allowPrivateNetwork;
         _time = time ?? TimeProvider.System;
+        _healthPath = apiBase + "/health";
+        _eventsPath = apiBase + "/events";
     }
 
     public void AllowHost(string host) => _hosts.Add(Normalize(host));
@@ -116,7 +121,7 @@ public sealed class AccessGuard
         }
 
         context.Items[ClientItem] = ClientId(context);
-        if (request.Path.Equals("/health", StringComparison.Ordinal))
+        if (request.Path.Equals(_healthPath, StringComparison.Ordinal))
         {
             await next(context);
             return;
@@ -169,7 +174,7 @@ public sealed class AccessGuard
         }
 
         // Browsers cannot set headers on EventSource; only the stream accepts a ticket.
-        return request.Path.Equals("/events", StringComparison.Ordinal)
+        return request.Path.Equals(_eventsPath, StringComparison.Ordinal)
             && _tokens!.TryRedeemTicket(request.Query["ticket"].ToString(), out token);
     }
 

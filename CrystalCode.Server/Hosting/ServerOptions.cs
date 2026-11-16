@@ -16,6 +16,12 @@ public sealed record ServerOptions
     /// <summary><c>host:port</c>. Port 0 picks a free port.</summary>
     public string Listen { get; init; } = DefaultListen;
 
+    /// <summary>
+    /// The URL path every route is served under, such as <c>/api</c>. Empty or
+    /// <c>/</c> serves from the root.
+    /// </summary>
+    public string ApiBase { get; init; } = string.Empty;
+
     /// <summary>A Unix domain socket path instead of TCP.</summary>
     public string? Socket { get; init; }
 

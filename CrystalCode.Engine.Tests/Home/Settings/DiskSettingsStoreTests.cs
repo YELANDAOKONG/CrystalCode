@@ -173,7 +173,8 @@ public sealed class DiskSettingsStoreTests
                     "allowOrigins": ["https://app.example.test"],
                     "allowHosts": ["crystal.example.test"],
                     "exposeHeaders": ["X-Request-Id"],
-                    "allowPrivateNetwork": true
+                    "allowPrivateNetwork": true,
+                    "apiBase": "/api/real/"
                   },
                 """,
                 StringComparison.Ordinal));
@@ -185,6 +186,7 @@ public sealed class DiskSettingsStoreTests
         Assert.Equal(["crystal.example.test"], reloaded.Server.AllowHosts);
         Assert.Equal(["X-Request-Id"], reloaded.Server.ExposeHeaders);
         Assert.True(reloaded.Server.AllowPrivateNetwork);
+        Assert.Equal("/api/real", reloaded.Server.ApiBase);
     }
 
     [Theory]
@@ -192,6 +194,9 @@ public sealed class DiskSettingsStoreTests
     [InlineData("""{ "allowOrigins": ["app.example.test"] }""", "allowOrigins")]
     [InlineData("""{ "allowHosts": [" "] }""", "allowHosts")]
     [InlineData("""{ "exposeHeaders": ["Bad Header"] }""", "exposeHeaders")]
+    [InlineData("""{ "apiBase": "api" }""", "apiBase")]
+    [InlineData("""{ "apiBase": "/api//real" }""", "apiBase")]
+    [InlineData("""{ "apiBase": "/api/../real" }""", "apiBase")]
     public void Server_RejectsInvalidEntries(string section, string name)
     {
         using var root = new TemporaryHome();

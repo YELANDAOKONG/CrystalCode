@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 
 using CrystalCode.Engine.Home;
 using CrystalCode.Server.Hosting;
@@ -14,7 +15,7 @@ namespace CrystalCode.Server.Endpoints;
 /// </summary>
 internal static class SessionEndpoints
 {
-    public static void Map(WebApplication app, ServerContext server)
+    public static void Map(IEndpointRouteBuilder app, ServerContext server)
     {
         app.MapGet("/quick-prompts", async (HttpContext context, CancellationToken token) =>
         {

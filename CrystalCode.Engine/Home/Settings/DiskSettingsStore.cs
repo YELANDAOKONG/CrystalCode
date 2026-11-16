@@ -757,7 +757,8 @@ public sealed class DiskSettingsStore : ISettingsStore
                 document.AllowOrigins ?? [],
                 document.AllowHosts ?? [],
                 document.ExposeHeaders ?? [],
-                document.AllowPrivateNetwork ?? false);
+                document.AllowPrivateNetwork ?? false,
+                document.ApiBase);
         }
         catch (ArgumentException exception)
         {
@@ -814,7 +815,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             AllowOrigins = settings.AllowOrigins.Count == 0 ? null : [.. settings.AllowOrigins],
             AllowHosts = settings.AllowHosts.Count == 0 ? null : [.. settings.AllowHosts],
             ExposeHeaders = settings.ExposeHeaders.Count == 0 ? null : [.. settings.ExposeHeaders],
-            AllowPrivateNetwork = settings.AllowPrivateNetwork ? true : null
+            AllowPrivateNetwork = settings.AllowPrivateNetwork ? true : null,
+            ApiBase = settings.ApiBase.Length == 0 ? null : settings.ApiBase
         };
     }
 

@@ -32,14 +32,16 @@ public sealed class CrystalServer : IAsyncDisposable
     private readonly ServerRuntime _runtime;
     private readonly CancellationTokenSource _shutdown = new();
     private readonly ListenAddress _listen;
+    private readonly string _apiBase;
     private WebApplication? _app;
     private ServerDiscovery? _discovery;
 
-    private CrystalServer(ServerOptions options, ServerRuntime runtime, ListenAddress listen)
+    private CrystalServer(ServerOptions options, ServerRuntime runtime, ListenAddress listen, string apiBase)
     {
         _options = options;
         _runtime = runtime;
         _listen = listen;
+        _apiBase = apiBase;
         Session = new ServerSession(options, runtime);
     }
 
@@ -88,7 +90,13 @@ public sealed class CrystalServer : IAsyncDisposable
             return false;
         }
 
-        server = new CrystalServer(options, runtime, listen);
+        if (!ServerHostSettings.TryNormalizeApiBase(options.ApiBase, out var apiBase))
+        {
+            error = "The API base \"" + options.ApiBase + "\" must be / or an absolute path such as /api, with no query, fragment, or empty segment.";
+            return false;
+        }
+
+        server = new CrystalServer(options, runtime, listen, apiBase);
         return true;
     }
 
@@ -151,7 +159,8 @@ public sealed class CrystalServer : IAsyncDisposable
             _options.AllowedHosts,
             _options.AllowedOrigins,
             _options.ExposedHeaders,
-            _options.AllowPrivateNetwork);
+            _options.AllowPrivateNetwork,
+            apiBase: _apiBase);
         if (!_listen.IsLoopback && !_listen.IsAny)
         {
             guard.AllowHost(_listen.Address.ToString());
@@ -168,7 +177,7 @@ public sealed class CrystalServer : IAsyncDisposable
             new RequestLedger(),
             () => Shutdown(ServerStopReason.Request));
         app.Use(guard.InvokeAsync);
-        ServerEndpoints.Map(app, context);
+        ServerEndpoints.Map(app.MapGroup(_apiBase), context);
         await app.StartAsync(cancellationToken);
         _app = app;
 
@@ -191,6 +200,7 @@ public sealed class CrystalServer : IAsyncDisposable
                 home,
                 Url,
                 workspace,
+                _apiBase,
                 _options.TokenGenerated ? _options.Token : null,
                 writer => ServerEndpoints.WriteBuild(writer, _runtime.Build));
         }
@@ -299,6 +309,10 @@ public sealed class CrystalServer : IAsyncDisposable
         }
 
         rows.Add(("Workspace", workspace));
+        if (_apiBase.Length > 0)
+        {
+            rows.Add(("API base", _apiBase));
+        }
         rows.Add(("Auth", _options.AuthenticationEnabled ? "token" : "none"));
         if (_options.TokenGenerated && _options.Token is { } token && _runtime.ShowGeneratedToken)
         {
@@ -380,6 +394,10 @@ public sealed class CrystalServer : IAsyncDisposable
             writer.WriteString("url", Url);
             writer.WriteNumber("pid", Environment.ProcessId);
             writer.WriteString("workspace", workspace);
+            if (_apiBase.Length > 0)
+            {
+                writer.WriteString("apiBase", _apiBase);
+            }
             if (_discovery is not null)
             {
                 writer.WriteString("discovery", _discovery.Path);

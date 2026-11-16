@@ -18,7 +18,8 @@ public sealed record ServerHostSettings
         IReadOnlyList<string> allowOrigins,
         IReadOnlyList<string> allowHosts,
         IReadOnlyList<string> exposeHeaders,
-        bool allowPrivateNetwork)
+        bool allowPrivateNetwork,
+        string? apiBase = null)
     {
         ArgumentNullException.ThrowIfNull(allowOrigins);
         ArgumentNullException.ThrowIfNull(allowHosts);
@@ -52,6 +53,14 @@ public sealed record ServerHostSettings
         AllowHosts = Array.AsReadOnly([.. allowHosts]);
         ExposeHeaders = Array.AsReadOnly([.. exposeHeaders]);
         AllowPrivateNetwork = allowPrivateNetwork;
+        if (!TryNormalizeApiBase(apiBase, out var normalized))
+        {
+            throw new ArgumentException(
+                "server.apiBase must be / or an absolute path such as /api, with no query, fragment, or empty segment.",
+                nameof(apiBase));
+        }
+
+        ApiBase = normalized;
     }
 
     public IReadOnlyList<string> AllowOrigins { get; }
@@ -64,11 +73,18 @@ public sealed record ServerHostSettings
     /// <summary>Answer the Private Network Access preflight of older browsers.</summary>
     public bool AllowPrivateNetwork { get; }
 
+    /// <summary>
+    /// The URL path every route is served under, without a trailing slash.
+    /// Empty serves from the root.
+    /// </summary>
+    public string ApiBase { get; }
+
     public bool IsDefault =>
         AllowOrigins.Count == 0
         && AllowHosts.Count == 0
         && ExposeHeaders.Count == 0
-        && !AllowPrivateNetwork;
+        && !AllowPrivateNetwork
+        && ApiBase.Length == 0;
 
     /// <summary>Allows a page from any origin.</summary>
     public const string AnyOrigin = "*";
@@ -98,6 +114,39 @@ public sealed record ServerHostSettings
         }
 
         origin = uri.GetLeftPart(UriPartial.Authority);
+        return true;
+    }
+
+    /// <summary>
+    /// Normalizes the API base path: a leading slash, no trailing slash, and
+    /// empty for the root. Null, empty, and <c>/</c> all mean the root.
+    /// </summary>
+    public static bool TryNormalizeApiBase(string? text, out string apiBase)
+    {
+        apiBase = string.Empty;
+        var value = text?.Trim() ?? string.Empty;
+        if (value.Length == 0 || value == "/")
+        {
+            return true;
+        }
+
+        if (value[0] != '/')
+        {
+            return false;
+        }
+
+        var trimmed = value.TrimEnd('/');
+        foreach (var segment in trimmed[1..].Split('/'))
+        {
+            if (segment.Length == 0
+                || segment is "." or ".."
+                || segment.Any(static c => char.IsControl(c) || char.IsWhiteSpace(c) || c is '?' or '#' or '\\' or '{' or '}' or '%' or '*'))
+            {
+                return false;
+            }
+        }
+
+        apiBase = trimmed;
         return true;
     }
 

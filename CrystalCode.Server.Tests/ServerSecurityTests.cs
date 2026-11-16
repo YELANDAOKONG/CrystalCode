@@ -37,6 +37,26 @@ public sealed class ServerSecurityTests
     }
 
     [Fact]
+    public async Task ApiBase_MovesEveryRouteUnderThePrefix()
+    {
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false), apiBase: "/api/real/");
+        await fixture.WaitReadyAsync();
+        using var anonymous = fixture.Client("anon", token: null);
+
+        Assert.Equal(HttpStatusCode.OK, (await anonymous.GetAsync("/api/real/health")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await fixture.Http.GetAsync("/health")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await fixture.Http.GetAsync("/snapshot")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/real/snapshot")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await fixture.Http.GetAsync("/api/real/snapshot")).StatusCode);
+
+        var ticket = await fixture.PostAsync(fixture.Http, "/api/real/auth/ticket", new { });
+        using var stream = await anonymous.GetAsync(
+            "/api/real/events?ticket=" + ticket.GetProperty("ticket").GetString(),
+            HttpCompletionOption.ResponseHeadersRead);
+        Assert.Equal(HttpStatusCode.OK, stream.StatusCode);
+    }
+
+    [Fact]
     public async Task AuthNone_AllowsRequestsAndWarns()
     {
         await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false), authentication: false);

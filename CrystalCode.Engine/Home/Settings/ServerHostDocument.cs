@@ -9,4 +9,6 @@ internal sealed class ServerHostDocument
     public List<string>? ExposeHeaders { get; set; }
 
     public bool? AllowPrivateNetwork { get; set; }
+
+    public string? ApiBase { get; set; }
 }
