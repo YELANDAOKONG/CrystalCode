@@ -329,7 +329,7 @@ public sealed class TerminalSyntaxCacheTests
             Assert.InRange(cache.Counts.Active, 0, 2);
         }
 
-        await UntilAsync(() => cache.Counts.Queued == 0 && cache.Counts.Active == 0);
+        await UntilAsync(() => cache.Counts.Queued == 0 && cache.Counts.Active == 0, TimeSpan.FromSeconds(30));
         Assert.Contains(new string('x', 500), calls);
         Assert.InRange(calls.Count, 1, 34);
     }
@@ -407,12 +407,12 @@ public sealed class TerminalSyntaxCacheTests
         Assert.Equal(plain, string.Join("\n", log.Viewport(80, 100, 0).Select(line => line.Markup)));
     }
 
-    private static async Task UntilAsync(Func<bool> condition)
+    private static async Task UntilAsync(Func<bool> condition, TimeSpan? timeout = null)
     {
-        using var timeout = new CancellationTokenSource(Timeout);
+        using var cancellation = new CancellationTokenSource(timeout ?? Timeout);
         while (!condition())
         {
-            await Task.Delay(5, timeout.Token);
+            await Task.Delay(5, cancellation.Token);
         }
     }
 

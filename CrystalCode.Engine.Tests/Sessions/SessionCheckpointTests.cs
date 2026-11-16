@@ -23,7 +23,7 @@ public sealed class SessionCheckpointTests
         using var headless = new HeadlessSession(client);
         await headless.Session.StartAsync(CancellationToken.None);
 
-        _ = headless.Session.SubmitAsync("first prompt", CancellationToken.None);
+        Assert.False(await headless.Session.SubmitAsync("first prompt", CancellationToken.None));
         await client.Entered.WaitAsync(TimeSpan.FromSeconds(10));
 
         var saved = headless.ReadSaved();
@@ -39,7 +39,7 @@ public sealed class SessionCheckpointTests
         using var headless = new HeadlessSession(client);
         await headless.Session.StartAsync(CancellationToken.None);
 
-        _ = headless.Session.SubmitAsync("inspect", CancellationToken.None);
+        Assert.False(await headless.Session.SubmitAsync("inspect", CancellationToken.None));
         await client.Entered.WaitAsync(TimeSpan.FromSeconds(10));
 
         var saved = headless.ReadSaved();
@@ -66,13 +66,12 @@ public sealed class SessionCheckpointTests
         await headless.Session.StartAsync(CancellationToken.None);
         await headless.RunTurnAsync("keep");
 
-        var running = headless.Session.SubmitAsync("take back", CancellationToken.None);
+        Assert.False(await headless.Session.SubmitAsync("take back", CancellationToken.None));
         await client.Entered.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Contains(headless.ReadSaved().Items, item => item.Text == "take back");
 
         Assert.True(headless.Session.TryRecall());
         await headless.Session.CompleteTurnAsync(CancellationToken.None);
-        Assert.False(await running);
 
         var saved = headless.ReadSaved();
         Assert.Contains(saved.Items, item => item.Text == "keep");
@@ -130,7 +129,7 @@ public sealed class SessionCheckpointTests
         var client = new HeldStreamingClient(ToolRound("todoread", "{}"));
         using var headless = new HeadlessSession(client);
         await headless.Session.StartAsync(CancellationToken.None);
-        _ = headless.Session.SubmitAsync("long task", CancellationToken.None);
+        Assert.False(await headless.Session.SubmitAsync("long task", CancellationToken.None));
         await client.Entered.WaitAsync(TimeSpan.FromSeconds(10));
 
         // The terminal's shutdown path: interrupt, collect without a token, close.
