@@ -878,6 +878,8 @@ implemented in the current build.
   catalog stay as they are. Do not reserve a configuration field or public
   type.
 
+- More detailed Status Line information for other front ends.
+
 ### Low priority
 
 - .NET CLI tool support. The direction is to ship the executable as a
