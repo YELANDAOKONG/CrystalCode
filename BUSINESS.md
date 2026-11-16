@@ -822,6 +822,13 @@ implemented in the current build.
   a background task runs. The operator interaction and how live output
   coexists with transcript cards are not defined. Preserve bounded logs,
   terminal safety, existing tool results, and session-local task lifecycle.
+- Native text-input questions. The built-in question tool should support a
+  free-form text-input question directly, without presenting “Type your own
+  answer” as a choice the operator must select first. The question shape,
+  multiline and empty-answer behavior, and how Terminal, Server, and Bridge
+  carry the input are not defined. Preserve existing choice and custom-answer
+  questions. Do not reserve public types or wire fields before defining the
+  behavior and ownership.
 
 ### Medium priority
 

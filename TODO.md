@@ -236,6 +236,12 @@ behavior stands until a specific change defines otherwise.
   session-local task lifecycle. The interaction for viewing background output
   and how live foreground output coexists with transcript cards are not yet
   defined; inspect the TUI and event ownership before implementation.
+- Native text-input questions: support a free-form question input directly,
+  without making the operator select “Type your own answer” first. The question
+  shape, multiline and empty-answer behavior, and how Terminal, Server, and
+  Bridge carry the input are not defined. Preserve existing choice and
+  custom-answer questions. Do not reserve public types or wire fields before
+  defining the behavior and ownership.
 
 These are part of the product direction and are not in the current build.
 The constraints are in `BUSINESS.md` under Deferred product work. Current
