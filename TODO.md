@@ -135,6 +135,12 @@ The constraints are in `BUSINESS.md` under Deferred product work.
 - Several active sessions in one `crystal server` process. Plugin and
   external tool load contexts are not collectible, so this needs that
   question answered first.
+- Message queue priority. When the operator presses Enter during a running
+  turn, the message joins the follow-up queue. Whether it should be sent at
+  the next turn boundary or after the current tool batch (the next tool
+  call), and whether that choice should be operator configuration, is not
+  decided. Deferred until the queue semantics are settled; see the several
+  queued follow-ups item under Pending evaluation.
 
 ## High priority
 
