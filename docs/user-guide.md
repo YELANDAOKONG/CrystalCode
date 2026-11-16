@@ -799,8 +799,8 @@ Starter catalog (merged with `providers.json`):
 | Provider | Protocol | Default base URI | Starter models |
 | :--- | :--- | :--- | :--- |
 | `deepseek` | `deepseek` | `https://api.deepseek.com/` | `deepseek-flash`, `deepseek-v4-flash` (compatibility alias), `deepseek-v4-pro` |
-| `openai` | `openai` | `https://api.openai.com/v1/` | `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna` |
-| `gemini` | `gemini` | `https://generativelanguage.googleapis.com/v1beta/` | `gemini-3.8-flash`, `gemini-3.1-pro-preview` |
+| `openai` | `openai` | `https://api.openai.com/v1/` | `gpt-6.1-sol`, `gpt-6.1-terra`, `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna` |
+| `gemini` | `gemini` | `https://generativelanguage.googleapis.com/v1beta/` | `gemini-4-carbon`, `gemini-4-argon`, `gemini-4-hydrogen` |
 | `ollama` | `ollama` | `http://localhost:11434/` | `qwen3:8b` (pull this model before selecting it) |
 
 Built-in DeepSeek V4 models enable thinking with efforts `low`,

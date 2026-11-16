@@ -90,7 +90,7 @@ public sealed class ChatClientFactoryTests
     public void Create_UsesNativeAdaptersAndKeylessOllama()
     {
         var defaults = HarnessSettings.CreateDefault();
-        var gemini = defaults.WithSelection(ProviderNames.Gemini, "gemini-3.8-flash");
+        var gemini = defaults.WithSelection(ProviderNames.Gemini, "gemini-4-carbon");
         var ollama = defaults.WithSelection(ProviderNames.Ollama, "qwen3:8b");
 
         using var geminiClient = Assert.IsType<GeminiProvider>(

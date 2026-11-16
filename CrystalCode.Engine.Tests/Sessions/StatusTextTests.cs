@@ -119,13 +119,13 @@ public sealed class StatusTextTests
             WorkTools: 1,
             ExternalTools: 0,
             CumulativeUsage: null,
-            ApprovalModel: "openai / gpt-5.6-sol",
+            ApprovalModel: "openai / gpt-6-sol",
             ApprovalThinking: "Think High");
 
         var text = StatusText.Format(status, full: false);
 
         Assert.Contains("Approval model", text, StringComparison.Ordinal);
-        Assert.Contains("openai / gpt-5.6-sol", text, StringComparison.Ordinal);
+        Assert.Contains("openai / gpt-6-sol", text, StringComparison.Ordinal);
         Assert.Contains("Approval thinking  High", text, StringComparison.Ordinal);
     }
 

@@ -29,7 +29,7 @@ public sealed class DescribeImageToolTests
         var client = new ScriptedImageClient("a red square");
         var reasoning = new ReasoningOptions(ReasoningMode.Enabled, ReasoningEffort.Low);
         var system = ImageDescriptionPrompt.ComposeSystem(
-            PromptContext.Create(root.Path, "openai", "gpt-5.6-sol", "image", string.Empty, string.Empty));
+            PromptContext.Create(root.Path, "openai", "gpt-6-sol", "image", string.Empty, string.Empty));
         var tool = new DescribeImageTool(
             new Workspace(root.Path),
             new ImageDescriber(() => client, system, reasoning));

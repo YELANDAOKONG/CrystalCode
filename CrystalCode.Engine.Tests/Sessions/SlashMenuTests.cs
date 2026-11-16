@@ -26,7 +26,7 @@ public sealed class SlashMenuTests
     {
         SlashCompletion[] models =
         [
-            new("gpt-5.6-sol", "openai", ["gpt-5.6-sol"]),
+            new("gpt-6-sol", "openai", ["gpt-6-sol"]),
             new("openai", "Provider", ["openai"])
         ];
         SlashCompletion[] efforts =
@@ -42,7 +42,7 @@ public sealed class SlashMenuTests
         var approval = menu.Single(item => item.Name == "approval");
 
         var model = approval.ArgumentOptions.Single(item => item.Name == "model");
-        Assert.Equal(["gpt-5.6-sol", "openai"], model.ArgumentOptions.Select(item => item.Name));
+        Assert.Equal(["gpt-6-sol", "openai"], model.ArgumentOptions.Select(item => item.Name));
         Assert.Equal("Show or set the approval model; on and off switch it", model.Help);
 
         var thinking = approval.ArgumentOptions.Single(item => item.Name == "thinking");

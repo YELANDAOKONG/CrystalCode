@@ -34,10 +34,10 @@ public sealed class ApprovalModelArgumentsTests
         Assert.False(off.Enabled);
 
         Assert.True(ApprovalModelArguments.TryParse(
-            "model openai gpt-5.6-sol",
+            "model openai gpt-6-sol",
             out var selection,
             out _));
-        Assert.Equal("openai gpt-5.6-sol", selection.Selection);
+        Assert.Equal("openai gpt-6-sol", selection.Selection);
         Assert.Null(selection.Enabled);
     }
 

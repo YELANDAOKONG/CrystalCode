@@ -1850,13 +1850,13 @@ public sealed class DiskSettingsStoreTests
         var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithSelection(
             new ProviderName("openai"),
-            "gpt-5.6-sol");
+            "gpt-6-sol");
 
         store.Save(settings);
         var loaded = store.Load();
 
         Assert.Equal("openai", loaded.Provider.Value);
-        Assert.Equal("gpt-5.6-sol", loaded.Model);
+        Assert.Equal("gpt-6-sol", loaded.Model);
     }
 
     [Fact]
@@ -2077,7 +2077,7 @@ public sealed class DiskSettingsStoreTests
         using var root = new TemporaryHome();
         var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithApprovalModel(
-            new ApprovalModelSettings(true, "openai", "gpt-5.6-sol"));
+            new ApprovalModelSettings(true, "openai", "gpt-6-sol"));
 
         store.Save(settings);
         var loaded = store.Load();
@@ -2085,7 +2085,7 @@ public sealed class DiskSettingsStoreTests
 
         Assert.True(loaded.ApprovalModel.Enabled);
         Assert.Equal("openai", loaded.ApprovalModel.Provider);
-        Assert.Equal("gpt-5.6-sol", loaded.ApprovalModel.Model);
+        Assert.Equal("gpt-6-sol", loaded.ApprovalModel.Model);
         Assert.Contains("\"enabled\": true", json, StringComparison.Ordinal);
     }
 
@@ -2098,7 +2098,7 @@ public sealed class DiskSettingsStoreTests
             new ApprovalModelSettings(
                 true,
                 "openai",
-                "gpt-5.6-sol",
+                "gpt-6-sol",
                 ThinkingSelection.Parse("high")));
 
         store.Save(settings);
@@ -2168,14 +2168,14 @@ public sealed class DiskSettingsStoreTests
         using var root = new TemporaryHome();
         var store = new DiskSettingsStore(root.Home);
         var settings = store.LoadOrCreate().WithCompactionModel(
-            new CompactionModelSettings(true, "openai", "gpt-5.6-sol"));
+            new CompactionModelSettings(true, "openai", "gpt-6-sol"));
 
         store.Save(settings);
         var loaded = store.Load();
 
         Assert.True(loaded.CompactionModel.Enabled);
         Assert.Equal("openai", loaded.CompactionModel.Provider);
-        Assert.Equal("gpt-5.6-sol", loaded.CompactionModel.Model);
+        Assert.Equal("gpt-6-sol", loaded.CompactionModel.Model);
         Assert.Equal(ThinkingSelection.Default, loaded.CompactionModel.ThinkingEffort);
         Assert.DoesNotContain(
             "thinkingEffort",
@@ -2231,7 +2231,7 @@ public sealed class DiskSettingsStoreTests
             new ResourceModelSettings(
                 true,
                 "openai",
-                "gpt-5.6-sol",
+                "gpt-6-sol",
                 ThinkingSelection.Parse("high")));
 
         store.Save(settings);
@@ -2240,7 +2240,7 @@ public sealed class DiskSettingsStoreTests
 
         Assert.True(loaded.ResourceModels.Image.Enabled);
         Assert.Equal("openai", loaded.ResourceModels.Image.Provider);
-        Assert.Equal("gpt-5.6-sol", loaded.ResourceModels.Image.Model);
+        Assert.Equal("gpt-6-sol", loaded.ResourceModels.Image.Model);
         Assert.Equal("high", loaded.ResourceModels.Image.ThinkingEffort.Value);
         Assert.Contains("\"enabled\": true", json, StringComparison.Ordinal);
         Assert.Contains("\"thinkingEffort\": \"high\"", json, StringComparison.Ordinal);
@@ -2348,7 +2348,7 @@ public sealed class DiskSettingsStoreTests
             """
             {
               "imageModel": { "provider": "deepseek", "model": "deepseek-v4-pro" },
-              "audioModel": { "provider": "openai", "model": "gpt-5.6-sol", "thinkingEffort": "high" }
+              "audioModel": { "provider": "openai", "model": "gpt-6-sol", "thinkingEffort": "high" }
             }
             """);
 

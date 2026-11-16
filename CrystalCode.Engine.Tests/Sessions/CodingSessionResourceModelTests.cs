@@ -134,8 +134,12 @@ public sealed class CodingSessionResourceModelTests
 
         Assert.Equal("unset", audio.Current);
         Assert.Equal("_crystal_describe", audio.Category);
-        Assert.Equal(["unset", "scripted/ears"], audio.Values.Select(static value => value.Value));
-        Assert.Equal("/describe audio model --select scripted ears", audio.Values[1].Command);
+        Assert.Equal(
+            ["unset", "scripted/ears"],
+            audio.Values.Select(static value => value.Value).Where(static value => !value.StartsWith("gemini/", StringComparison.Ordinal)));
+        Assert.Equal(
+            "/describe audio model --select scripted ears",
+            audio.Values.Single(static value => value.Value == "scripted/ears").Command);
         Assert.DoesNotContain(options, static option => option.Id == "audio_context");
 
         await headless.Session.SubmitAsync("/describe image model scripted eyes", CancellationToken.None);

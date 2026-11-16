@@ -157,31 +157,31 @@ public sealed class SessionLaunchOverridesTests
     public void Overrides_ConfiguresTheApprovalModelInMemory()
     {
         var stored = HarnessSettings.CreateDefault().WithApprovalModel(
-            new ApprovalModelSettings(true, "openai", "gpt-5.6-sol"));
+            new ApprovalModelSettings(true, "openai", "gpt-6-sol"));
 
         var off = AssertApplied(stored, new SessionLaunchOptions { ApprovalModel = "off" });
 
         Assert.False(off.ApprovalModel.Enabled);
         Assert.Equal("openai", off.ApprovalModel.Provider);
-        Assert.Equal("gpt-5.6-sol", off.ApprovalModel.Model);
+        Assert.Equal("gpt-6-sol", off.ApprovalModel.Model);
         Assert.True(stored.ApprovalModel.Enabled);
 
         var on = AssertApplied(
             stored.WithApprovalModel(stored.ApprovalModel.DisabledCopy()),
             new SessionLaunchOptions { ApprovalModel = "on" });
         Assert.True(on.ApprovalModel.Enabled);
-        Assert.Equal("gpt-5.6-sol", on.ApprovalModel.Model);
+        Assert.Equal("gpt-6-sol", on.ApprovalModel.Model);
 
         var selected = AssertApplied(
             HarnessSettings.CreateDefault(),
             new SessionLaunchOptions
             {
                 ApprovalProvider = "openai",
-                ApprovalModelId = "gpt-5.6-terra"
+                ApprovalModelId = "gpt-6.1-terra"
             });
         Assert.True(selected.ApprovalModel.Enabled);
         Assert.Equal("openai", selected.ApprovalModel.Provider);
-        Assert.Equal("gpt-5.6-terra", selected.ApprovalModel.Model);
+        Assert.Equal("gpt-6.1-terra", selected.ApprovalModel.Model);
         Assert.Equal(ProviderNames.DeepSeek, selected.Provider);
 
         var geared = AssertApplied(
@@ -194,11 +194,11 @@ public sealed class SessionLaunchOverridesTests
             stored,
             new SessionLaunchOptions
             {
-                ApprovalModelId = "gpt-5.6-sol",
+                ApprovalModelId = "gpt-6-sol",
                 ApprovalThinking = "high"
             });
         Assert.True(selectedWithGear.ApprovalModel.Enabled);
-        Assert.Equal("gpt-5.6-sol", selectedWithGear.ApprovalModel.Model);
+        Assert.Equal("gpt-6-sol", selectedWithGear.ApprovalModel.Model);
         Assert.Equal("high", selectedWithGear.ApprovalModel.ThinkingEffort.Value);
         Assert.Equal(ThinkingSelection.Default, stored.ApprovalModel.ThinkingEffort);
 
@@ -213,9 +213,9 @@ public sealed class SessionLaunchOverridesTests
 
         var selectedKeepsGear = AssertApplied(
             storedWithGear,
-            new SessionLaunchOptions { ApprovalModelId = "gpt-5.6-sol" });
+            new SessionLaunchOptions { ApprovalModelId = "gpt-6-sol" });
         Assert.True(selectedKeepsGear.ApprovalModel.Enabled);
-        Assert.Equal("gpt-5.6-sol", selectedKeepsGear.ApprovalModel.Model);
+        Assert.Equal("gpt-6-sol", selectedKeepsGear.ApprovalModel.Model);
         Assert.Equal("high", selectedKeepsGear.ApprovalModel.ThinkingEffort.Value);
 
         var offKeepsGear = AssertApplied(
@@ -229,31 +229,31 @@ public sealed class SessionLaunchOverridesTests
     public void Overrides_ConfiguresTheCompactionModelInMemory()
     {
         var stored = HarnessSettings.CreateDefault().WithCompactionModel(
-            new CompactionModelSettings(true, "openai", "gpt-5.6-sol"));
+            new CompactionModelSettings(true, "openai", "gpt-6-sol"));
 
         var off = AssertApplied(stored, new SessionLaunchOptions { CompactionModel = "off" });
 
         Assert.False(off.CompactionModel.Enabled);
         Assert.Equal("openai", off.CompactionModel.Provider);
-        Assert.Equal("gpt-5.6-sol", off.CompactionModel.Model);
+        Assert.Equal("gpt-6-sol", off.CompactionModel.Model);
         Assert.True(stored.CompactionModel.Enabled);
 
         var on = AssertApplied(
             stored.WithCompactionModel(stored.CompactionModel.DisabledCopy()),
             new SessionLaunchOptions { CompactionModel = "on" });
         Assert.True(on.CompactionModel.Enabled);
-        Assert.Equal("gpt-5.6-sol", on.CompactionModel.Model);
+        Assert.Equal("gpt-6-sol", on.CompactionModel.Model);
 
         var selected = AssertApplied(
             HarnessSettings.CreateDefault(),
             new SessionLaunchOptions
             {
                 CompactionProvider = "openai",
-                CompactionModelId = "gpt-5.6-terra"
+                CompactionModelId = "gpt-6.1-terra"
             });
         Assert.True(selected.CompactionModel.Enabled);
         Assert.Equal("openai", selected.CompactionModel.Provider);
-        Assert.Equal("gpt-5.6-terra", selected.CompactionModel.Model);
+        Assert.Equal("gpt-6.1-terra", selected.CompactionModel.Model);
         Assert.Equal(ProviderNames.DeepSeek, selected.Provider);
 
         var geared = AssertApplied(
@@ -480,8 +480,18 @@ public sealed class SessionLaunchOverridesTests
     [Fact]
     public void UnavailableThinking_SkipsOffWhenTheModelDoesNotThink()
     {
-        var settings = HarnessSettings.CreateDefault()
-            .WithOverrides("openai", "gpt-5.6-sol")
+        var provider = new ProviderDefinition(
+            new ProviderName("quiet"),
+            ProviderProtocol.OpenAI,
+            new Uri("https://example.test/v1/"),
+            new Dictionary<string, ModelSettings> { ["plain"] = new(200_000) },
+            requiresApiKey: false);
+        var settings = new HarnessSettings(
+                provider.Name,
+                "plain",
+                ApprovalMode.Review,
+                0.8,
+                new ProviderCatalog([provider]))
             .WithThinkingEffort(ThinkingSelection.Off);
 
         Assert.Empty(SessionLaunchOverrides.UnavailableThinkingNotes(settings));

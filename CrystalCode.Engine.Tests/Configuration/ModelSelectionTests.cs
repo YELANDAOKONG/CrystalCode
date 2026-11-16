@@ -209,7 +209,7 @@ public sealed class ModelSelectionTests
         Assert.Contains("deepseek-v4-flash  (current)", text, StringComparison.Ordinal);
         Assert.Contains("openrouter", text, StringComparison.Ordinal);
         Assert.Contains("anthropic/claude-sonnet-4", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("gpt-5.6-sol  (current)", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("gpt-6-sol  (current)", text, StringComparison.Ordinal);
     }
 
     internal static ProviderCatalog Catalog()
