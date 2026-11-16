@@ -106,11 +106,12 @@ See the [complete command reference](docs/user-guide.md#slash-commands).
 
 ## 💻 Command line
 
-Run these from your shell. The interactive terminal, `crystal server`, and `crystal bridge` host a session; the others start, do their work, and exit without one:
+Run these from your shell. The interactive terminal, `crystal server`, `crystal web`, and `crystal bridge` host a session; the others start, do their work, and exit without one:
 
 | Command | What it does |
 | :--- | :--- |
 | `crystal server` | Serve one session over HTTP so another front end, such as a web page or a desktop program, can drive it. Prints one JSON `listening` line and writes `~/.crystal/server/<pid>.json`. A bearer token is required by default (`CRYSTAL_SERVER_TOKEN`, `--token-file`, `--token-stdin`, or generated); `--auth none` turns it off. Accepts the same session options as `crystal`, plus `--listen`, `--socket`, `--api-base`, `--tls-cert`/`--tls-key`, `--allow-host`, `--allow-origin`, `--expose-header`, and `--allow-private-network`. See [docs/server.md](docs/server.md) |
+| `crystal web` | `crystal server` plus the web front end you put in `~/.crystal/web`. The product contains no HTML. The API is fixed under `/api`, `GET /config` at the root tells the page its `apiBase` and whether authentication is on, and files and `/config` need no token. The page's own origin is allowed; others need `--allow-origin`. Accepts every `crystal server` option except `--api-base`, plus `--spa-fallback on\|off`. See [docs/server.md](docs/server.md#web-mode) |
 | `crystal bridge` | Serve one session to an Agent Client Protocol (ACP) editor such as Zed, which starts it as a subprocess and speaks ACP on stdin and stdout: saved sessions with load, resume, and fork, streaming, tool calls with diffs, permission, config options, the editor's MCP servers and extra directories, forms, child Agents, compaction updates, and `_crystal/*` extensions for the rest of the session. Configure the editor with `{"command": "crystal", "args": ["bridge"]}`. Accepts the same session options as `crystal`, plus `--workspace` and `--space` for a session request without `cwd`. See [docs/bridge.md](docs/bridge.md) |
 | `crystal run <task>` | Run one task without a terminal and exit. Anything that would ask the operator is denied. Accepts process-only overrides such as `--provider`, `--model`, `--workspace`, `--approval`, and repeatable `--prompt-attachment`; they are not written to `config.json` |
 | `crystal space` | Open the terminal in the operator space at `~/.crystal/space` |

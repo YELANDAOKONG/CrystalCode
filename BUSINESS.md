@@ -20,7 +20,8 @@ the Crystal library they already own.
 
 The current product is a terminal application with an HTTP server for other
 front ends. `crystal` opens the terminal. `crystal server` serves the same
-session capabilities over HTTP (see below). `crystal bridge` serves one
+session capabilities over HTTP (see below). `crystal web` is `crystal server`
+plus the operator's own web front end from `~/.crystal/web`. `crystal bridge` serves one
 session to an Agent Client Protocol (ACP) editor over stdio. Those three are
 the operator surfaces. `crystal space` opens that
 terminal in the operator space at `~/.crystal/space`. `crystal` and
@@ -194,6 +195,21 @@ separate library with no terminal code. The product can:
   TLS is allowed with a warning. Host and Origin checks always apply. The
   protocol carries no version identifier, and its flags are not written to
   `config.json`. See [docs/server.md](docs/server.md);
+- serve that same session together with a web front end using `crystal web`.
+  The product contains no HTML, script, or style of its own: the operator
+  puts the front end files in `web/` in the Crystal home, and `crystal web`
+  serves them. It is `crystal server` with the API fixed under `/api` and
+  nothing in the command line, `config.json`, or a plugin able to move it.
+  `GET /config` at the root, public and never under `/api`, tells the page the
+  facts it needs before it has a token: `product`, `apiBase`, and
+  `authentication`. Files and `/config` need no token; only `/api` does. The
+  page's own origin is allowed without an `--allow-origin` entry, and no other
+  origin is unless listed. A request can never read a file outside `web/`,
+  and dot-prefixed, hidden, and system files are never served. A path with no
+  file and no extension answers with `index.html` so a front end router can
+  work, and `web.spaFallback` or `--spa-fallback off` turns that off. Every
+  `crystal server` option except `--api-base` works the same here. See
+  [docs/server.md](docs/server.md);
 - drive one session from an ACP editor, such as Zed, with `crystal bridge`.
   The editor starts it as a subprocess and speaks ACP v1 on stdin and stdout;
   stdout carries protocol lines only. It accepts the same session launch
@@ -897,8 +913,8 @@ implemented in the current build.
   server`, and `crystal bridge` do. The toolkit, target platforms, launch,
   packaging, and whether it lives in this repository are not defined. If it
   uses Avalonia, its UI is written in C# markup with no XAML or AXAML files.
-  A web front end is not this item: it drives `crystal server` and is outside
-  this repository. Do not add a project, package, or public architectural
+  A web front end is not this item: it drives `crystal server` or
+  `crystal web` and its files are the operator's, outside this repository. Do not add a project, package, or public architectural
   boundary for it;
 - switchable thinking-chain compression. After each thinking pass, a model
   compresses and summarizes that thinking according to a requirement. The

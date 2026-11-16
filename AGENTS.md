@@ -18,7 +18,8 @@ between TODO.md buckets is a design decision.
 
 ## Product
 
-CrystalCode is a production coding TUI. The terminal, `crystal server`, and
+CrystalCode is a production coding TUI. The terminal, `crystal server`,
+`crystal web`, and
 `crystal bridge` are the operator surfaces. `crystal server` serves one
 session over HTTP to
 separate front ends (see [docs/server.md](docs/server.md)); those front ends
@@ -73,7 +74,10 @@ semantics. Do not copy its Demo UI into this product.
   `CrystalCode.Engine.Launch`; a front end maps its own command line onto
   `SessionLaunchOptions` and does not copy override, trust, or resume code.
 - `CrystalCode.Server` is a front end like the terminal. It holds no product
-  logic, does not reference `CrystalCode.Display`, Spectre.Console,
+  logic and contains no HTML, script, or style: `crystal web` serves only
+  files the operator puts in `~/.crystal/web`, fixes the API under `/api`,
+  and exposes the public `/config` route; no option may move that prefix.
+  It does not reference `CrystalCode.Display`, Spectre.Console,
   Terminal.Gui, the executable, or `System.Console`, and writes every wire
   field explicitly; it never serializes an engine record by reflection. Its
   protocol carries no version identifier. One process hosts one active

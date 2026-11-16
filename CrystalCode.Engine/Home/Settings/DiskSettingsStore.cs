@@ -136,6 +136,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             operatorNotify: ReadOperatorNotify(document.OperatorNotify),
             server: ReadServer(document.Server),
             bridge: ReadBridge(document.Bridge),
+            web: ReadWeb(document.Web),
             theme: theme.Name,
             approvalColors: theme.ApprovalColors,
             httpHeaders: HeaderSettings.Read(document.HttpHeaders, "config.json httpHeaders", allowNull: false));
@@ -220,6 +221,7 @@ public sealed class DiskSettingsStore : ISettingsStore
             OperatorNotify = WriteOperatorNotify(settings.OperatorNotify),
             Server = WriteServer(settings.Server),
             Bridge = WriteBridge(settings.Bridge),
+            Web = WriteWeb(settings.Web),
             CompactionModel = WriteCompactionModel(settings.CompactionModel),
             MicroCompaction = WriteMicroCompaction(settings.MicroCompaction),
             ResourceTrim = WriteResourceTrim(settings.ResourceTrim),
@@ -765,6 +767,12 @@ public sealed class DiskSettingsStore : ISettingsStore
             throw new InvalidOperationException(exception.Message, exception);
         }
     }
+
+    private static WebHostSettings ReadWeb(WebHostDocument? document) =>
+        document is null ? WebHostSettings.Default : new WebHostSettings(document.SpaFallback ?? true);
+
+    private static WebHostDocument? WriteWeb(WebHostSettings settings) =>
+        settings.IsDefault ? null : new WebHostDocument { SpaFallback = settings.SpaFallback };
 
     private static BridgeHostSettings ReadBridge(BridgeHostDocument? document)
     {

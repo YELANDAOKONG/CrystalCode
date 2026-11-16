@@ -65,6 +65,9 @@ public sealed class CrystalHome
 
     public string SpaceDirectory => Path.Combine(Root, SpaceDirectoryName);
 
+    /// <summary>The files <c>crystal web</c> serves. Nothing is built in.</summary>
+    public string WebDirectory => Path.Combine(Root, "web");
+
     public string DataDirectory => Path.Combine(Root, "data");
 
     public static CrystalHome Resolve(string? root = null)

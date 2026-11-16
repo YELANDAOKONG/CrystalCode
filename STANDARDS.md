@@ -262,7 +262,10 @@ against a real Kestrel listener on a loopback port chosen by the OS and a
 scripted model: turns, events, reconnect, targeted replies, every interaction
 kind, recall, quick prompts, images, export, resume, shutdown, scopes,
 tickets, Host and Origin checks, the read-only queries, the parity guards,
-and the secret-leak test.
+and the secret-leak test. Web mode (`crystal web`) is tested there too:
+`/config`, files with their headers, the SPA fallback on and off, files that
+cannot shadow `/api` or `/config`, path traversal sent byte for byte over a
+raw socket, hidden files, the page's own origin, and a missing web directory.
 `crystal bridge` is tested in CrystalCode.Bridge.Tests over in-process pipes
 with a scripted model: initialize, new, load with replay, resume without
 replay, load into another `cwd`, list paging, prompts with every content

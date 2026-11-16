@@ -99,6 +99,8 @@ internal sealed class SettingsDocument
 
     public BridgeHostDocument? Bridge { get; set; }
 
+    public WebHostDocument? Web { get; set; }
+
     public CompactionModelDocument? CompactionModel { get; set; }
 
     public MicroCompactionDocument? MicroCompaction { get; set; }

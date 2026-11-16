@@ -30,6 +30,8 @@ public static class Program
                 .WithDescription("Open the operator space and start the terminal.");
             config.AddCommand<ServerCommand>("server")
                 .WithDescription("Serve one session over HTTP for other front ends.");
+            config.AddCommand<WebCommand>("web")
+                .WithDescription("Serve one session over HTTP together with the web front end in the Crystal home.");
             config.AddCommand<BridgeCommand>("bridge")
                 .WithDescription("Serve one session to an ACP editor over stdin and stdout.");
             config.AddBranch<ExtensionSettings>("plugins", plugins =>

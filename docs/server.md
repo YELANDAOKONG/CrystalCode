@@ -4,7 +4,8 @@
 or a wrapper program such as a desktop application, starts it in a workspace.
 Separate front ends, for example a web page or a desktop program, then connect
 to it over HTTP and drive the session. Those front ends are not part of this
-repository.
+repository. `crystal web` is the same server with the operator's own web front
+end served next to it; see [Web mode](#web-mode).
 
 The server is in this build. It uses these engine pieces, which any other
 front end can use too:
@@ -104,6 +105,71 @@ crystal server [session launch options] [-w|--workspace <PATH>] [-r|--resume [TA
 - A TLS private key password comes from `CRYSTAL_SERVER_TLS_PASSWORD`, never
   from the command line.
 - No secret is a command flag.
+
+## Web mode
+
+`crystal web` serves the same session and the same API as `crystal server`,
+and also serves a web front end that the operator provides. The server holds
+no HTML, script, or style of its own.
+
+```text
+crystal web [every crystal server option except --api-base] [--spa-fallback on|off]
+```
+
+- The front end is the directory `web/` in the Crystal home, normally
+  `~/.crystal/web`. `--home` and `CRYSTAL_HOME` move it. Crystal never creates
+  the directory, writes into it, or ships a file for it. `index.html` is the
+  entry page.
+- The API prefix is fixed to `/api`. There is no `--api-base`, and
+  `server.apiBase` in `config.json` does not apply to `crystal web`. Every
+  route in this document lives under `/api`: `GET /api/health`,
+  `POST /api/input`, `GET /api/events`, and so on. An unknown path under
+  `/api` is a 404 problem response and never falls through to a file.
+- `GET /config` is at the root, never under `/api`, and needs no token, because
+  a page reads it before it can have one. It answers with
+  `Cache-Control: no-store`:
+
+  ```json
+  {"product":"crystal-code","apiBase":"/api","authentication":true}
+  ```
+
+  It names only what a front end needs to start: `product`, `apiBase`, and
+  `authentication`. It carries no token, path, workspace, or build detail.
+  New fields may be added; a name is not changed or removed. `crystal server`
+  has no `/config`.
+- Files and `/config` need no token; only `/api` does. Authentication, scopes,
+  tickets, and the failure limit apply to `/api` exactly as in
+  `crystal server`. The Host check applies to every path.
+- Origin: the page's own origin (`scheme://host[:port]` equal to the request's
+  scheme and Host) is allowed without an entry, because a browser sends it on
+  same-origin `POST` and stream requests. Any other origin needs
+  `--allow-origin` or `server.allowOrigins`, exactly as in `crystal server`.
+  The default is never `*`. Behind a proxy that changes the scheme or Host,
+  list the public origin.
+- Files are read through ASP.NET Core's `PhysicalFileProvider` rooted at
+  `web/`. A request cannot leave that root: `..`, encoded and double-encoded
+  dots and separators, backslashes, and NUL are never resolved to a file
+  outside it, and a test sends them byte for byte. Dot-prefixed, hidden, and
+  system files (`.env`, `.git/`) are never served. A symbolic link inside
+  `web/` is followed, so the operator decides what `web/` contains. Only `GET`
+  and `HEAD` read files. A file with an extension the framework does not know
+  is a 404. Responses carry `X-Content-Type-Options: nosniff` and
+  `Cache-Control: no-cache`.
+- `/` and a directory path with a trailing slash serve that directory's
+  `index.html`. A file in `web/` never shadows `/api` or `/config`.
+- SPA fallback: a path with no file and no extension answers `index.html`, so a
+  front end router works. A path with an extension and no file is a 404.
+  `--spa-fallback on|off` overrides `web.spaFallback` in `config.json`
+  (default `true`) for one process. The command line never writes it.
+- If `web/` does not exist, or has no `index.html`, the server still starts and
+  serves `/api` and `/config`, prints a warning on stderr, and answers file
+  requests with 404.
+- `--listen`, `--socket`, TLS, `--auth`, the token sources, `--allow-host`,
+  `--allow-origin`, `--expose-header`, `--allow-private-network`,
+  `--exit-on-stdin-close`, the session launch options, the discovery file, and
+  the `listening` line behave as in `crystal server`. The `listening` line,
+  the discovery file, and the startup summary add `apiBase` (`/api`), and the
+  summary adds the `Web` directory.
 
 ## Startup
 

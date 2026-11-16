@@ -22,6 +22,12 @@ public sealed record ServerOptions
     /// </summary>
     public string ApiBase { get; init; } = string.Empty;
 
+    /// <summary>
+    /// Serve a front end from a directory next to the API. The API prefix is
+    /// then fixed, so <see cref="ApiBase"/> must stay empty.
+    /// </summary>
+    public WebOptions? Web { get; init; }
+
     /// <summary>A Unix domain socket path instead of TCP.</summary>
     public string? Socket { get; init; }
 

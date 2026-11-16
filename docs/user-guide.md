@@ -515,6 +515,34 @@ session options `crystal` accepts, plus `--workspace`, `--space`, and
 The protocol, scopes, endpoints, events, and reconnect rules are in
 [server.md](server.md).
 
+### Web front end
+
+`crystal web` is `crystal server` plus a web front end that you provide. The
+product ships no HTML. Put the files in `~/.crystal/web` (`web/` in the data
+directory, so `--home` and `CRYSTAL_HOME` move it), with `index.html` as the
+entry page, and start it:
+
+```bash
+cd your-repo
+crystal web
+```
+
+- It accepts every `crystal server` option except `--api-base`. The API is
+  always under `/api`, and `GET /config` at the root tells the page
+  `{"product":"crystal-code","apiBase":"/api","authentication":true}` without a
+  token. Files and `/config` need no token; `/api` does.
+- The page's own origin is allowed without `--allow-origin`. Any other origin
+  needs it, as in `crystal server`.
+- Requests cannot read outside `web/`, and dot-prefixed, hidden, and system
+  files such as `.env` are never served.
+- A path with no file and no extension answers `index.html` for front end
+  routers. `--spa-fallback off` or `web.spaFallback: false` in `config.json`
+  turns that off.
+- A missing `web/` or `index.html` prints a warning; `/api` and `/config`
+  still work.
+
+See [server.md](server.md#web-mode).
+
 ## Credentials
 
 Do not put secrets in the workspace, in this repository, or in commit
@@ -736,7 +764,8 @@ Top-level fields:
 | `backgroundBashTimeoutSeconds` | `bash_start` background task timeout. Omitted keeps 10800 seconds (3 hours). A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; `bash_stop` and session shutdown still stop the task |
 | `retry` | Work-turn and compaction retry policy. Object with `enabled` (default `true`; `false` disables retries), `maximumRetries` (0-100, default 5), `initialDelaySeconds` (0-3600, default 2), `backoffFactor` (1-100, default 2), `jitterFactor` (0-1, default 0.25), and `maximumDelaySeconds` (0-86400, default 30; the backoff cap when Retry-After is absent). Invalid values stop startup. Work retries publish `RetryScheduled` |
 | `approvalRetry` | The same object shape for the Review and Audit approval reviewer. Independent of `retry`. Reviewer retries are silent; exhausted retries fall back to your approval prompt |
-| `server` | Defaults for `crystal server`. `allowOrigins` (origins such as `https://app.example.test`, no path, or `*` for any origin), `allowHosts` (extra `Host` values), `exposeHeaders` (extra `Access-Control-Expose-Headers` names), and `allowPrivateNetwork` (default `false`), and `apiBase` (default `/`; the path prefix every route is served under, such as `/api`). The matching command-line options add to these, except `--api-base`, which replaces `apiBase`. Invalid entries stop startup |
+| `server` | Defaults for `crystal server`. `allowOrigins` (origins such as `https://app.example.test`, no path, or `*` for any origin), `allowHosts` (extra `Host` values), `exposeHeaders` (extra `Access-Control-Expose-Headers` names), `allowPrivateNetwork` (default `false`), and `apiBase` (default `/`; the path prefix every route is served under, such as `/api`). `crystal web` uses the same lists but ignores `apiBase`, which it fixes to `/api`. The matching command-line options add to these, except `--api-base`, which replaces `apiBase`. Invalid entries stop startup |
+| `web` | Defaults for `crystal web` beyond `server`. `spaFallback` (default `true`; omitted when on) answers a path that has no file and no extension with `index.html`; `crystal web --spa-fallback on\|off` overrides it for one process and never writes it. An invalid value stops startup |
 | `bridge` | Which session options `crystal bridge` shows an editor as config options. `customConfigOptions` (default `false`) turns the list on; while it is off the built-in default `mode`, `model`, `thinking`, `approval`, `agents` applies and a saved list is kept but unused. `configOptions` accepts [the option ids in the Bridge catalog](bridge.md#configuration) or `["all"]` for every option. `workspaceTrust` (default `false`) turns on the trust question for editor-opened directories; `crystal bridge --workspace-trust on|off` overrides it for one process, and the top-level `workspaceTrust` does not apply to Bridge. Hidden options stay available as slash commands. `crystal bridge --config-options`, `--default-config-options`, and `--all-config-options` override it for one process. `crystal bridge --debug [FILE]` logs redacted protocol traffic to stderr or a file. An unknown id or an empty list stops startup. See [bridge.md](bridge.md) |
 | `operatorNotify` | Optional command run when the session waits for you. Omitted means off. `command` (executable and arguments, no shell), `enabled` (default `true` when `command` is set), `events` (`approval`, `question`, `turn`; default `["approval", "question"]`), `delaySeconds` (0-3600, default 0), and `timeoutSeconds` (1-600, default 10). Invalid values stop startup. See [Operator notification](#operator-notification) |
 
@@ -2565,6 +2594,8 @@ Override with `CRYSTAL_HOME` or `--home`.
   access.json
   instructions.md
   AGENTS.md
+  web/
+    index.html        # your front end for crystal web; the product ships none
   prompts/
     work.md
     plan.md

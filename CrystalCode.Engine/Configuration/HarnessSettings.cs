@@ -118,6 +118,7 @@ public sealed record HarnessSettings
         OperatorNotifySettings? operatorNotify = null,
         ServerHostSettings? server = null,
         BridgeHostSettings? bridge = null,
+        WebHostSettings? web = null,
         string theme = ThemeCatalog.DefaultName,
         bool approvalColors = DefaultApprovalColors,
         PursueModelSettings? pursueModel = null,
@@ -227,6 +228,7 @@ public sealed record HarnessSettings
         OperatorNotify = operatorNotify ?? OperatorNotifySettings.Off;
         Server = server ?? ServerHostSettings.Default;
         Bridge = bridge ?? BridgeHostSettings.Default;
+        Web = web ?? WebHostSettings.Default;
         Theme = ThemeCatalog.Canonical(theme);
         ApprovalColors = approvalColors;
         CompactionModel = compactionModel ?? CompactionModelSettings.Off;
@@ -534,6 +536,9 @@ public sealed record HarnessSettings
 
     /// <summary>Which session options <c>crystal bridge</c> offers. The terminal ignores them.</summary>
     public BridgeHostSettings Bridge { get; }
+
+    /// <summary>Defaults for <c>crystal web</c> beyond <see cref="Server"/>. The terminal ignores them.</summary>
+    public WebHostSettings Web { get; }
 
     public CompactionModelSettings CompactionModel { get; }
 
@@ -1024,6 +1029,7 @@ public sealed record HarnessSettings
         OperatorNotifySettings? operatorNotify = null,
         ServerHostSettings? server = null,
         BridgeHostSettings? bridge = null,
+        WebHostSettings? web = null,
         string? theme = null,
         bool? approvalColors = null,
         PursueModelSettings? pursueModel = null,
@@ -1085,6 +1091,7 @@ public sealed record HarnessSettings
             operatorNotify ?? OperatorNotify,
             server ?? Server,
             bridge ?? Bridge,
+            web ?? Web,
             theme ?? Theme,
             approvalColors ?? ApprovalColors,
             pursueModel ?? PursueModel,

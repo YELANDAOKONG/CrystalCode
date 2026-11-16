@@ -14,7 +14,7 @@ internal static class ServerTokenSource
     private const int MinimumLength = 16;
 
     public static async Task<(string? Token, bool Generated, string Error)> ResolveAsync(
-        ServerSettings settings,
+        ServerCommandSettings settings,
         TextReader input,
         Func<string, string?> environment,
         CancellationToken cancellationToken)

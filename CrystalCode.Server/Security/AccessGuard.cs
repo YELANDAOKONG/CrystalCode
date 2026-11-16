@@ -13,7 +13,8 @@ namespace CrystalCode.Server.Security;
 /// Origin that is not allowed, then authenticates the bearer token or a
 /// single-use event-stream ticket. Repeated failures from one address are
 /// slowed down. <c>/health</c> needs no token. With authentication off,
-/// every request has the admin scope.
+/// every request has the admin scope. In web mode the page's own origin is
+/// allowed without a list entry and only the API prefix needs a token.
 /// </summary>
 public sealed class AccessGuard
 {
@@ -37,6 +38,8 @@ public sealed class AccessGuard
     private readonly TimeProvider _time;
     private readonly string _healthPath;
     private readonly string _eventsPath;
+    private readonly string _apiBase;
+    private readonly bool _web;
 
     public AccessGuard(
         TokenStore? tokens,
@@ -45,7 +48,8 @@ public sealed class AccessGuard
         IEnumerable<string>? exposedHeaders = null,
         bool allowPrivateNetwork = false,
         TimeProvider? time = null,
-        string apiBase = "")
+        string apiBase = "",
+        bool web = false)
     {
         ArgumentNullException.ThrowIfNull(hosts);
         ArgumentNullException.ThrowIfNull(origins);
@@ -67,6 +71,8 @@ public sealed class AccessGuard
         _time = time ?? TimeProvider.System;
         _healthPath = apiBase + "/health";
         _eventsPath = apiBase + "/events";
+        _apiBase = apiBase;
+        _web = web;
     }
 
     public void AllowHost(string host) => _hosts.Add(Normalize(host));
@@ -77,7 +83,8 @@ public sealed class AccessGuard
         ArgumentNullException.ThrowIfNull(next);
         var request = context.Request;
         var origin = request.Headers.Origin.ToString();
-        var originAllowed = origin.Length > 0 && (_anyOrigin || _origins.Contains(origin.TrimEnd('/')));
+        var originAllowed = origin.Length > 0
+            && (_anyOrigin || _origins.Contains(origin.TrimEnd('/')) || (_web && IsSameOrigin(request, origin)));
         if (origin.Length > 0)
         {
             context.Response.Headers.Vary = "Origin";
@@ -122,6 +129,14 @@ public sealed class AccessGuard
 
         context.Items[ClientItem] = ClientId(context);
         if (request.Path.Equals(_healthPath, StringComparison.Ordinal))
+        {
+            await next(context);
+            return;
+        }
+
+        // Front end files and /config are public by design: a page has to load
+        // before it can hold a token. Only the API prefix is authenticated.
+        if (_web && !request.Path.StartsWithSegments(_apiBase, StringComparison.OrdinalIgnoreCase))
         {
             await next(context);
             return;
@@ -177,6 +192,9 @@ public sealed class AccessGuard
         return request.Path.Equals(_eventsPath, StringComparison.Ordinal)
             && _tokens!.TryRedeemTicket(request.Query["ticket"].ToString(), out token);
     }
+
+    private static bool IsSameOrigin(HttpRequest request, string origin) =>
+        string.Equals(origin.TrimEnd('/'), request.Scheme + "://" + request.Host.Value, StringComparison.OrdinalIgnoreCase);
 
     private bool HostAllowed(HostString host)
     {

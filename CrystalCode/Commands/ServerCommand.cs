@@ -28,7 +28,7 @@ public sealed class ServerCommand : AsyncCommand<ServerSettings>
     }
 
     internal static async Task<int> RunAsync(
-        ServerSettings settings,
+        ServerCommandSettings settings,
         TextReader input,
         TextWriter output,
         TextWriter error,
@@ -47,10 +47,11 @@ public sealed class ServerCommand : AsyncCommand<ServerSettings>
             return 1;
         }
 
-        ServerHostSettings configured;
+        HarnessSettings harness;
+        var home = CrystalHome.Resolve(settings.Home);
         try
         {
-            configured = new DiskSettingsStore(CrystalHome.Resolve(settings.Home)).LoadOrCreate().Server;
+            harness = new DiskSettingsStore(home).LoadOrCreate();
         }
         catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
         {
@@ -58,6 +59,13 @@ public sealed class ServerCommand : AsyncCommand<ServerSettings>
             return 1;
         }
 
+        if (!settings.TryResolve(harness, home, out var apiBase, out var web, out var resolveError))
+        {
+            await error.WriteLineAsync(resolveError);
+            return 1;
+        }
+
+        var configured = harness.Server;
         var options = new ServerOptions
         {
             Launch = new SessionLaunchRequest(
@@ -69,7 +77,8 @@ public sealed class ServerCommand : AsyncCommand<ServerSettings>
                 settings.Resume.Value),
             Listen = settings.Listen ?? ServerOptions.DefaultListen,
             Socket = settings.Socket,
-            ApiBase = settings.ApiBase ?? configured.ApiBase,
+            ApiBase = apiBase ?? string.Empty,
+            Web = web,
             TlsCertificate = settings.TlsCert,
             TlsKey = settings.TlsKey,
             Token = token,

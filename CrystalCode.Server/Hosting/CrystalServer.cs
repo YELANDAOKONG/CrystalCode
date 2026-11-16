@@ -90,13 +90,19 @@ public sealed class CrystalServer : IAsyncDisposable
             return false;
         }
 
+        if (options.Web is not null && !string.IsNullOrWhiteSpace(options.ApiBase))
+        {
+            error = "The API base is fixed to " + WebOptions.ApiBase + " in web mode.";
+            return false;
+        }
+
         if (!ServerHostSettings.TryNormalizeApiBase(options.ApiBase, out var apiBase))
         {
             error = "The API base \"" + options.ApiBase + "\" must be / or an absolute path such as /api, with no query, fragment, or empty segment.";
             return false;
         }
 
-        server = new CrystalServer(options, runtime, listen, apiBase);
+        server = new CrystalServer(options, runtime, listen, options.Web is null ? apiBase : WebOptions.ApiBase);
         return true;
     }
 
@@ -160,7 +166,8 @@ public sealed class CrystalServer : IAsyncDisposable
             _options.AllowedOrigins,
             _options.ExposedHeaders,
             _options.AllowPrivateNetwork,
-            apiBase: _apiBase);
+            apiBase: _apiBase,
+            web: _options.Web is not null);
         if (!_listen.IsLoopback && !_listen.IsAny)
         {
             guard.AllowHost(_listen.Address.ToString());
@@ -178,6 +185,7 @@ public sealed class CrystalServer : IAsyncDisposable
             () => Shutdown(ServerStopReason.Request));
         app.Use(guard.InvokeAsync);
         ServerEndpoints.Map(app.MapGroup(_apiBase), context);
+        var webWarning = _options.Web is { } web ? WebEndpoints.Map(app, context, web) : null;
         await app.StartAsync(cancellationToken);
         _app = app;
 
@@ -190,6 +198,10 @@ public sealed class CrystalServer : IAsyncDisposable
         }
 
         await WarnAsync();
+        if (webWarning is not null)
+        {
+            await _runtime.Error.WriteLineAsync(webWarning);
+        }
         var home = CrystalHome.Resolve(_options.Launch.Options.Home);
         var workspace = _options.Launch.Space
             ? OperatorSpace.Resolve(home)
@@ -309,6 +321,10 @@ public sealed class CrystalServer : IAsyncDisposable
         }
 
         rows.Add(("Workspace", workspace));
+        if (_options.Web is { } served)
+        {
+            rows.Add(("Web", Path.GetFullPath(served.Root)));
+        }
         if (_apiBase.Length > 0)
         {
             rows.Add(("API base", _apiBase));

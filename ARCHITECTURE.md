@@ -175,22 +175,23 @@ guard. Does not reference the host executable.
 
 ### CrystalCode.Server
 
-The HTTP front end behind `crystal server`: ASP.NET Core Minimal API endpoints
+The HTTP front end behind `crystal server` and `crystal web`: ASP.NET Core Minimal API endpoints
 and server-sent events on Kestrel, authentication and scopes, the explicit
 wire mapping, the interaction broker, the event log, and the host that wires
 `SessionRunner` to HTTP. One process hosts one active session. It holds no
-product logic. The executable's `Commands/ServerCommand` parses the command
-line, resolves the token, and hands off to it. The protocol is in
+product logic and no HTML. The executable's `Commands/ServerCommand` and
+`Commands/WebCommand` parse the command
+line, resolve the token, and hand off to it. The protocol is in
 [docs/server.md](docs/server.md).
 
 | Folder | Owns |
 | :--- | :--- |
-| `Hosting` | `CrystalServer` (Kestrel, startup, the listening line, warnings, shutdown), `ServerSession` (launch, the live `CodingSession`, `SessionRunner`, close), `ServerOptions`, `ServerRuntime`, `ListenAddress`, the discovery file, `ClientRegistry`, and the `clientRequestId` ledger |
-| `Security` | `AccessGuard` (Host and Origin checks, CORS and exposed headers for listed origins, bearer tokens, stream tickets, failure rate limit; the lists come from `--allow-*`/`--expose-header` and the `server` section of `config.json`), `TokenStore` (hashed process-local tokens), scopes and the scope of each `SessionVerb`, problem responses |
+| `Hosting` | `CrystalServer` (Kestrel, startup, the listening line, warnings, shutdown), `ServerSession` (launch, the live `CodingSession`, `SessionRunner`, close), `ServerOptions`, `WebOptions` (web mode: the fixed `/api` base, the front end directory, the SPA fallback), `ServerRuntime`, `ListenAddress`, the discovery file, `ClientRegistry`, and the `clientRequestId` ledger |
+| `Security` | `AccessGuard` (Host and Origin checks, CORS and exposed headers for listed origins and, in web mode, the page's own origin; bearer tokens, stream tickets, failure rate limit, and in web mode no token outside the API prefix; the lists come from `--allow-*`/`--expose-header` and the `server` section of `config.json`), `TokenStore` (hashed process-local tokens), scopes and the scope of each `SessionVerb`, problem responses |
 | `Events` | `EventHub`: the session observer that numbers, serializes, buffers, and fans out events and owns the `SessionState` reducer |
 | `Interactions` | `InteractionBroker`: approval, question, trust, session, and child prompts as interactions with validated answers |
 | `Wire` | `WireWriter`, `WireEvents`, `SnapshotWriter`: every wire field written explicitly |
-| `Endpoints` | Route groups for input and modes, images, quick prompts, side questions, children, export, interactions, tokens, and the event stream |
+| `Endpoints` | Route groups for input and modes, images, quick prompts, side questions, children, export, interactions, tokens, and the event stream; `WebEndpoints` adds `/config`, the API 404, and the front end files through a `PhysicalFileProvider` rooted at the web directory (it refuses paths outside the root and hides dot-prefixed, hidden, and system files) |
 
 ### CrystalCode.Server.Tests
 
@@ -400,7 +401,7 @@ CrystalCode (executable):
 
 | Folder | Owns |
 | :--- | :--- |
-| `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `space` opens the operator space under the data directory. `run` is the headless task command. `server` resolves the server token (`ServerTokenSource`) and signals (`ShutdownSignals`) and starts `CrystalCode.Server`. `bridge` captures the raw stdio streams, rebinds console output to stderr, registers signals, opens the optional `--debug` sink (stderr or an appended file), and starts `CrystalCode.Bridge`. `version` prints the build identity. `login` and `logout` run `AccountSignIn` for one account provider with a console `ILoginInteraction` (`Terminal/ConsoleLoginInteraction`, `Terminal/BrowserLauncher`) |
+| `Commands` | Spectre.Console.Cli commands. Bare `crystal` stays the terminal. `space` opens the operator space under the data directory. `run` is the headless task command. `server` resolves the server token (`ServerTokenSource`) and signals (`ShutdownSignals`) and starts `CrystalCode.Server`. `web` is the same command through the shared `ServerCommandSettings`, with `--api-base` absent, `--spa-fallback` added, and the front end directory taken from `CrystalHome.WebDirectory`. `bridge` captures the raw stdio streams, rebinds console output to stderr, registers signals, opens the optional `--debug` sink (stderr or an appended file), and starts `CrystalCode.Bridge`. `version` prints the build identity. `login` and `logout` run `AccountSignIn` for one account provider with a console `ILoginInteraction` (`Terminal/ConsoleLoginInteraction`, `Terminal/BrowserLauncher`) |
 | `Run` | Unattended front end for `crystal run`: plain-text or JSON-lines log, denied operator prompts, unsupported questions, and exit codes. Overrides and launch preparation come from `CrystalCode.Engine.Launch` |
 | `Terminal` | Host loop, event projection, session renderer, status and tool-list widgets, progress and tool-call text (`ToolCallText` reveals hidden characters in the engine's `ToolCallSummary`), transcript replay, session picker, question overlay, startup trust and resume prompts (`StartupPrompt`), slash-option mapping |
 | `Terminal/Approvals` | Approval prompt, card, diff preview, and keys |

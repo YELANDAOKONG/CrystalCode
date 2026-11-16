@@ -2,6 +2,8 @@ using Spectre.Console;
 using Spectre.Console.Cli;
 
 using CrystalCode.Commands;
+using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Home.Settings;
 
 using Xunit;
 
@@ -160,6 +162,134 @@ public sealed class ServerCommandTests
         Assert.Contains("--space", help, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void WebHelp_ListsServerOptionsButNoApiBase()
+    {
+        var writer = new StringWriter();
+        var console = AnsiConsole.Create(new AnsiConsoleSettings
+        {
+            Ansi = AnsiSupport.No,
+            Out = new AnsiConsoleOutput(writer),
+        });
+        var app = new CommandApp<RunCommand>();
+        app.Configure(config =>
+        {
+            config.SetApplicationName("crystal");
+            config.ConfigureConsole(console);
+            config.AddCommand<WebCommand>("web");
+        });
+
+        Assert.Equal(0, app.Run(["web", "--help"]));
+        var help = writer.ToString();
+        foreach (var option in new[]
+        {
+            "--listen", "--socket", "--tls-cert", "--auth", "--token-file", "--token-stdin", "--allow-host",
+            "--allow-origin", "--expose-header", "--allow-private-network", "--exit-on-stdin-close",
+            "--workspace", "--space", "--resume", "--prompt-set", "--spa-fallback"
+        })
+        {
+            Assert.Contains(option, help, StringComparison.Ordinal);
+        }
+
+        Assert.DoesNotContain("--api-base", help, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ServerHelp_ListsTheApiBase()
+    {
+        var writer = new StringWriter();
+        var console = AnsiConsole.Create(new AnsiConsoleSettings
+        {
+            Ansi = AnsiSupport.No,
+            Out = new AnsiConsoleOutput(writer),
+        });
+        var app = new CommandApp<RunCommand>();
+        app.Configure(config =>
+        {
+            config.SetApplicationName("crystal");
+            config.ConfigureConsole(console);
+            config.AddCommand<ServerCommand>("server");
+        });
+
+        Assert.Equal(0, app.Run(["server", "--help"]));
+        var help = writer.ToString();
+        Assert.Contains("--api-base", help, StringComparison.Ordinal);
+        Assert.DoesNotContain("--spa-fallback", help, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WebSettings_FixTheApiBaseAndServeTheHomeWebDirectory()
+    {
+        using var home = new TemporaryDirectory();
+        var crystalHome = new CrystalHome(home.Root);
+        var configured = new DiskSettingsStore(crystalHome).LoadOrCreate();
+
+        Assert.True(Web().TryResolve(configured, crystalHome, out var apiBase, out var web, out var error));
+
+        Assert.Null(apiBase);
+        Assert.Equal(string.Empty, error);
+        Assert.Equal(crystalHome.WebDirectory, web!.Root);
+        Assert.True(web.SpaFallback);
+    }
+
+    [Theory]
+    [InlineData("on", true)]
+    [InlineData("OFF", false)]
+    public void WebSettings_SpaFallbackFlagOverridesTheConfig(string flag, bool expected)
+    {
+        using var home = new TemporaryDirectory();
+        var crystalHome = new CrystalHome(home.Root);
+        var store = new DiskSettingsStore(crystalHome);
+        store.Save(store.LoadOrCreate());
+        File.WriteAllText(
+            crystalHome.ConfigPath,
+            File.ReadAllText(crystalHome.ConfigPath).Replace("{", "{ \"web\": { \"spaFallback\": false },", StringComparison.Ordinal));
+        var configured = store.Load();
+
+        Assert.True(Web().TryResolve(configured, crystalHome, out _, out var web, out _));
+        Assert.False(web!.SpaFallback);
+        Assert.True(Web(flag).TryResolve(configured, crystalHome, out _, out web, out _));
+        Assert.Equal(expected, web!.SpaFallback);
+    }
+
+    [Fact]
+    public void WebSettings_RejectAnUnknownSpaFallbackValue()
+    {
+        using var home = new TemporaryDirectory();
+        var crystalHome = new CrystalHome(home.Root);
+        var configured = new DiskSettingsStore(crystalHome).LoadOrCreate();
+
+        Assert.False(Web("maybe").TryResolve(configured, crystalHome, out _, out var web, out var error));
+
+        Assert.Null(web);
+        Assert.Contains("on or off", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ServerSettings_ApiBaseFlagOverridesTheConfig()
+    {
+        using var home = new TemporaryDirectory();
+        var crystalHome = new CrystalHome(home.Root);
+        var store = new DiskSettingsStore(crystalHome);
+        store.Save(store.LoadOrCreate());
+        File.WriteAllText(
+            crystalHome.ConfigPath,
+            File.ReadAllText(crystalHome.ConfigPath).Replace("{", "{ \"server\": { \"apiBase\": \"/from-config\" },", StringComparison.Ordinal));
+        var configured = store.Load();
+        var plain = new ServerSettings { Resume = new FlagValue<string?>() };
+        var flagged = new ServerSettings { Resume = new FlagValue<string?>(), ApiBase = "/from-flag" };
+
+        Assert.True(plain.TryResolve(configured, crystalHome, out var fromConfig, out var web, out _));
+        Assert.True(flagged.TryResolve(configured, crystalHome, out var fromFlag, out _, out _));
+
+        Assert.Equal("/from-config", fromConfig);
+        Assert.Equal("/from-flag", fromFlag);
+        Assert.Null(web);
+    }
+
+    private static WebSettings Web(string? spaFallback = null) =>
+        new() { Resume = new FlagValue<string?>(), SpaFallback = spaFallback };
+
     private static ServerSettings Settings(string? auth = null, string? tokenFile = null, bool tokenStdin = false) =>
         new()
         {
@@ -168,4 +298,11 @@ public sealed class ServerCommandTests
             TokenStdin = tokenStdin,
             Resume = new FlagValue<string?>()
         };
+
+    private sealed class TemporaryDirectory : IDisposable
+    {
+        public string Root { get; } = Directory.CreateTempSubdirectory("crystal-web-settings-").FullName;
+
+        public void Dispose() => Directory.Delete(Root, recursive: true);
+    }
 }
