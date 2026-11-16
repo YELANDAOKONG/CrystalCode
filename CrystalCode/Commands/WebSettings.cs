@@ -16,6 +16,8 @@ public sealed class WebSettings : ServerCommandSettings
     [CommandOption("--spa-fallback <on|off>")]
     public string? SpaFallback { get; init; }
 
+    internal override string DefaultAuth(HarnessSettings configured) => configured.Web.Auth;
+
     internal override bool TryResolve(
         HarnessSettings configured,
         CrystalHome home,

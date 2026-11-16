@@ -760,7 +760,8 @@ public sealed class DiskSettingsStore : ISettingsStore
                 document.AllowHosts ?? [],
                 document.ExposeHeaders ?? [],
                 document.AllowPrivateNetwork ?? false,
-                document.ApiBase);
+                document.ApiBase,
+                document.Auth);
         }
         catch (ArgumentException exception)
         {
@@ -768,11 +769,31 @@ public sealed class DiskSettingsStore : ISettingsStore
         }
     }
 
-    private static WebHostSettings ReadWeb(WebHostDocument? document) =>
-        document is null ? WebHostSettings.Default : new WebHostSettings(document.SpaFallback ?? true);
+    private static WebHostSettings ReadWeb(WebHostDocument? document)
+    {
+        if (document is null)
+        {
+            return WebHostSettings.Default;
+        }
+
+        try
+        {
+            return new WebHostSettings(document.SpaFallback ?? true, document.Auth);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidOperationException(exception.Message, exception);
+        }
+    }
 
     private static WebHostDocument? WriteWeb(WebHostSettings settings) =>
-        settings.IsDefault ? null : new WebHostDocument { SpaFallback = settings.SpaFallback };
+        settings.IsDefault
+            ? null
+            : new WebHostDocument
+            {
+                SpaFallback = settings.SpaFallback ? null : false,
+                Auth = settings.Auth == WebHostSettings.DefaultAuth ? null : settings.Auth
+            };
 
     private static BridgeHostSettings ReadBridge(BridgeHostDocument? document)
     {
@@ -824,7 +845,8 @@ public sealed class DiskSettingsStore : ISettingsStore
             AllowHosts = settings.AllowHosts.Count == 0 ? null : [.. settings.AllowHosts],
             ExposeHeaders = settings.ExposeHeaders.Count == 0 ? null : [.. settings.ExposeHeaders],
             AllowPrivateNetwork = settings.AllowPrivateNetwork ? true : null,
-            ApiBase = settings.ApiBase.Length == 0 ? null : settings.ApiBase
+            ApiBase = settings.ApiBase.Length == 0 ? null : settings.ApiBase,
+            Auth = settings.Auth == ServerHostSettings.AuthToken ? null : settings.Auth
         };
     }
 

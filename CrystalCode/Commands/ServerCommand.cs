@@ -36,17 +36,6 @@ public sealed class ServerCommand : AsyncCommand<ServerSettings>
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        var (token, generated, tokenError) = await ServerTokenSource.ResolveAsync(
-            settings,
-            input,
-            Environment.GetEnvironmentVariable,
-            cancellationToken);
-        if (tokenError.Length > 0)
-        {
-            await error.WriteLineAsync(tokenError);
-            return 1;
-        }
-
         HarnessSettings harness;
         var home = CrystalHome.Resolve(settings.Home);
         try
@@ -62,6 +51,18 @@ public sealed class ServerCommand : AsyncCommand<ServerSettings>
         if (!settings.TryResolve(harness, home, out var apiBase, out var web, out var resolveError))
         {
             await error.WriteLineAsync(resolveError);
+            return 1;
+        }
+
+        var (token, generated, tokenError) = await ServerTokenSource.ResolveAsync(
+            settings,
+            input,
+            Environment.GetEnvironmentVariable,
+            cancellationToken,
+            settings.DefaultAuth(harness));
+        if (tokenError.Length > 0)
+        {
+            await error.WriteLineAsync(tokenError);
             return 1;
         }
 

@@ -11,4 +11,6 @@ internal sealed class ServerHostDocument
     public bool? AllowPrivateNetwork { get; set; }
 
     public string? ApiBase { get; set; }
+
+    public string? Auth { get; set; }
 }

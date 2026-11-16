@@ -222,6 +222,11 @@ and the `server.state` event.
   Only the SHA-256 of each token is kept, and comparison is constant time.
 - `--auth none` turns token checks off. Every request then has every scope.
   The server prints a warning at start. Host and Origin checks still apply.
+  Without `--auth`, `crystal server` uses `server.auth` and `crystal web` uses
+  `web.auth` from `config.json`. Their defaults are `token` and `none`. A
+  token source (`CRYSTAL_SERVER_TOKEN`, `--token-file`, `--token-stdin`)
+  with no `--auth` means `token`. The configured value is applied on any
+  listen address; the warning is the only guard.
 - A non-loopback listener without TLS is allowed. The server prints a warning
   that tokens and session content travel in clear text.
 - Requests send `Authorization: Bearer <token>`. `GET /health` needs no token

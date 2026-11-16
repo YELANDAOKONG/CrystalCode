@@ -58,6 +58,9 @@ public abstract class ServerCommandSettings : SessionLaunchSettings
     [CommandOption("--exit-on-stdin-close")]
     public bool ExitOnStdinClose { get; init; }
 
+    /// <summary>The authentication mode when <c>--auth</c> is absent.</summary>
+    internal abstract string DefaultAuth(HarnessSettings configured);
+
     /// <summary>
     /// Decides what differs between the two commands: the API prefix and the
     /// front end. A command line wins over <c>config.json</c> for this process.

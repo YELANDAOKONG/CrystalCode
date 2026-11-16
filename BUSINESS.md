@@ -191,6 +191,10 @@ separate library with no terminal code. The product can:
   unchanged. Clients refresh from a snapshot and reconnect by event sequence
   number. A bearer token is required by default on every listener and never
   appears on the command line; `--auth none` turns it off with a warning.
+  `crystal web` is the exception: it starts without authentication, with the
+  same warning, because its page is normally on the operator's own machine.
+  `server.auth` and `web.auth` in `config.json` set either default, and
+  `--auth` overrides it for one process.
   Tokens carry `observe`, `operate`, or `admin` scopes. A LAN listener without
   TLS is allowed with a warning. Host and Origin checks always apply. The
   protocol carries no version identifier, and its flags are not written to

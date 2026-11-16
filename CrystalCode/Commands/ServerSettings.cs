@@ -12,6 +12,8 @@ public sealed class ServerSettings : ServerCommandSettings
     [CommandOption("--api-base <PATH>")]
     public string? ApiBase { get; init; }
 
+    internal override string DefaultAuth(HarnessSettings configured) => configured.Server.Auth;
+
     internal override bool TryResolve(
         HarnessSettings configured,
         CrystalHome home,

@@ -14,12 +14,19 @@ public sealed record ServerHostSettings
 
     public static ServerHostSettings Default { get; } = new([], [], [], false);
 
+    /// <summary>Authentication by bearer token.</summary>
+    public const string AuthToken = "token";
+
+    /// <summary>No authentication.</summary>
+    public const string AuthNone = "none";
+
     public ServerHostSettings(
         IReadOnlyList<string> allowOrigins,
         IReadOnlyList<string> allowHosts,
         IReadOnlyList<string> exposeHeaders,
         bool allowPrivateNetwork,
-        string? apiBase = null)
+        string? apiBase = null,
+        string? auth = null)
     {
         ArgumentNullException.ThrowIfNull(allowOrigins);
         ArgumentNullException.ThrowIfNull(allowHosts);
@@ -61,6 +68,29 @@ public sealed record ServerHostSettings
         }
 
         ApiBase = normalized;
+        if (!TryNormalizeAuth(auth, AuthToken, out var normalizedAuth))
+        {
+            throw new ArgumentException("server.auth must be token or none.", nameof(auth));
+        }
+
+        Auth = normalizedAuth;
+    }
+
+    /// <summary>
+    /// How <c>crystal server</c> authenticates when <c>--auth</c> is absent:
+    /// <see cref="AuthToken"/> (the default) or <see cref="AuthNone"/>.
+    /// </summary>
+    public string Auth { get; }
+
+    /// <summary>
+    /// Normalizes an authentication mode. Null or empty yields
+    /// <paramref name="fallback"/>; anything but token or none fails.
+    /// </summary>
+    public static bool TryNormalizeAuth(string? text, string fallback, out string auth)
+    {
+        var value = text?.Trim().ToLowerInvariant();
+        auth = string.IsNullOrEmpty(value) ? fallback : value;
+        return auth is AuthToken or AuthNone;
     }
 
     public IReadOnlyList<string> AllowOrigins { get; }
@@ -84,7 +114,8 @@ public sealed record ServerHostSettings
         && AllowHosts.Count == 0
         && ExposeHeaders.Count == 0
         && !AllowPrivateNetwork
-        && ApiBase.Length == 0;
+        && ApiBase.Length == 0
+        && Auth == AuthToken;
 
     /// <summary>Allows a page from any origin.</summary>
     public const string AnyOrigin = "*";

@@ -485,9 +485,13 @@ session options `crystal` accepts, plus `--workspace`, `--space`, and
 
 - `--listen <host:port>` defaults to `127.0.0.1:0` (a free port).
   `--socket <path>` uses a Unix socket instead.
-- A bearer token is required by default, even on loopback. The server takes
-  it from `CRYSTAL_SERVER_TOKEN`, an owner-only `--token-file`, or one line
-  on stdin with `--token-stdin`. Otherwise it generates one and writes it to
+- A bearer token is required by default in `crystal server`, even on loopback.
+  `crystal web` defaults to no authentication; see [Web front end](#web-front-end).
+  `server.auth` and `web.auth` in `config.json` (`token` or `none`) change those
+  defaults, and `--auth` overrides them for one process. The server takes
+  a token from `CRYSTAL_SERVER_TOKEN`, an owner-only `--token-file`, or one line
+  on stdin with `--token-stdin`; with no `--auth`, any of these means token
+  authentication. Otherwise it generates one and writes it to
   the discovery file. A token is never a command flag. `--auth none` turns
   authentication off and prints a warning.
 - To reach it from another machine on the LAN, listen on `0.0.0.0:<port>`.
@@ -538,6 +542,12 @@ crystal web
 - A path with no file and no extension answers `index.html` for front end
   routers. `--spa-fallback off` or `web.spaFallback: false` in `config.json`
   turns that off.
+- Authentication is off by default here, because the usual use is a page on
+  your own machine. The server prints its warning at start. `web.auth` set to
+  `token` in `config.json`, or `--auth token`, turns tokens on. The default is
+  not tied to the listen address: with `--listen 0.0.0.0`, no `--auth`, and no
+  token source, the server is open to the network, so pass `--auth token`.
+  `GET /config` reports `authentication` so the page can skip its login.
 - A missing `web/` or `index.html` prints a warning; `/api` and `/config`
   still work.
 
@@ -764,8 +774,8 @@ Top-level fields:
 | `backgroundBashTimeoutSeconds` | `bash_start` background task timeout. Omitted keeps 10800 seconds (3 hours). A positive integer up to 4,294,967 replaces it. `null` or `"unlimited"` disables that timer; `bash_stop` and session shutdown still stop the task |
 | `retry` | Work-turn and compaction retry policy. Object with `enabled` (default `true`; `false` disables retries), `maximumRetries` (0-100, default 5), `initialDelaySeconds` (0-3600, default 2), `backoffFactor` (1-100, default 2), `jitterFactor` (0-1, default 0.25), and `maximumDelaySeconds` (0-86400, default 30; the backoff cap when Retry-After is absent). Invalid values stop startup. Work retries publish `RetryScheduled` |
 | `approvalRetry` | The same object shape for the Review and Audit approval reviewer. Independent of `retry`. Reviewer retries are silent; exhausted retries fall back to your approval prompt |
-| `server` | Defaults for `crystal server`. `allowOrigins` (origins such as `https://app.example.test`, no path, or `*` for any origin), `allowHosts` (extra `Host` values), `exposeHeaders` (extra `Access-Control-Expose-Headers` names), `allowPrivateNetwork` (default `false`), and `apiBase` (default `/`; the path prefix every route is served under, such as `/api`). `crystal web` uses the same lists but ignores `apiBase`, which it fixes to `/api`. The matching command-line options add to these, except `--api-base`, which replaces `apiBase`. Invalid entries stop startup |
-| `web` | Defaults for `crystal web` beyond `server`. `spaFallback` (default `true`; omitted when on) answers a path that has no file and no extension with `index.html`; `crystal web --spa-fallback on\|off` overrides it for one process and never writes it. An invalid value stops startup |
+| `server` | Defaults for `crystal server`. `auth` (`token`, the default, or `none`; `--auth` overrides it for one process), `allowOrigins` (origins such as `https://app.example.test`, no path, or `*` for any origin), `allowHosts` (extra `Host` values), `exposeHeaders` (extra `Access-Control-Expose-Headers` names), `allowPrivateNetwork` (default `false`), and `apiBase` (default `/`; the path prefix every route is served under, such as `/api`). `crystal web` uses the same lists but ignores `apiBase`, which it fixes to `/api`. The matching command-line options add to these, except `--api-base`, which replaces `apiBase`. Invalid entries stop startup |
+| `web` | Defaults for `crystal web` beyond `server`. `auth` (`none`, the default, or `token`; `--auth` overrides it for one process, and a token source such as `--token-file` implies `token`), `spaFallback` (default `true`; omitted when on) answers a path that has no file and no extension with `index.html`; `crystal web --spa-fallback on\|off` overrides it for one process and never writes it. An invalid value stops startup |
 | `bridge` | Which session options `crystal bridge` shows an editor as config options. `customConfigOptions` (default `false`) turns the list on; while it is off the built-in default `mode`, `model`, `thinking`, `approval`, `agents` applies and a saved list is kept but unused. `configOptions` accepts [the option ids in the Bridge catalog](bridge.md#configuration) or `["all"]` for every option. `workspaceTrust` (default `false`) turns on the trust question for editor-opened directories; `crystal bridge --workspace-trust on|off` overrides it for one process, and the top-level `workspaceTrust` does not apply to Bridge. Hidden options stay available as slash commands. `crystal bridge --config-options`, `--default-config-options`, and `--all-config-options` override it for one process. `crystal bridge --debug [FILE]` logs redacted protocol traffic to stderr or a file. An unknown id or an empty list stops startup. See [bridge.md](bridge.md) |
 | `operatorNotify` | Optional command run when the session waits for you. Omitted means off. `command` (executable and arguments, no shell), `enabled` (default `true` when `command` is set), `events` (`approval`, `question`, `turn`; default `["approval", "question"]`), `delaySeconds` (0-3600, default 0), and `timeoutSeconds` (1-600, default 10). Invalid values stop startup. See [Operator notification](#operator-notification) |
 

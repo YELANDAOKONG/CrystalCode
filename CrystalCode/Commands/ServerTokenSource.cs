@@ -1,3 +1,4 @@
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Server.Security;
 
 namespace CrystalCode.Commands;
@@ -6,6 +7,8 @@ namespace CrystalCode.Commands;
 /// Resolves the startup token without ever reading it from a flag:
 /// <c>CRYSTAL_SERVER_TOKEN</c>, then an owner-only <c>--token-file</c>, then
 /// one line on stdin with <c>--token-stdin</c>, otherwise a new random token.
+/// Without <c>--auth</c>, a token source on hand means token authentication;
+/// otherwise the configured default applies.
 /// </summary>
 internal static class ServerTokenSource
 {
@@ -17,10 +20,19 @@ internal static class ServerTokenSource
         ServerCommandSettings settings,
         TextReader input,
         Func<string, string?> environment,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string defaultAuth = ServerHostSettings.AuthToken)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        var auth = settings.Auth?.Trim().ToLowerInvariant() ?? "token";
+        var auth = settings.Auth?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(auth))
+        {
+            auth = settings.TokenFile is not null
+                || settings.TokenStdin
+                || !string.IsNullOrWhiteSpace(environment(EnvironmentVariable))
+                    ? ServerHostSettings.AuthToken
+                    : defaultAuth;
+        }
         if (auth == "none")
         {
             return settings.TokenFile is not null || settings.TokenStdin

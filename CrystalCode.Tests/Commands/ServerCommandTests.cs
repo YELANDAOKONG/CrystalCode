@@ -287,6 +287,50 @@ public sealed class ServerCommandTests
         Assert.Null(web);
     }
 
+    [Fact]
+    public async Task Resolve_UsesTheConfiguredDefaultOnlyWithoutAnExplicitChoiceOrTokenSource()
+    {
+        var none = await ServerTokenSource.ResolveAsync(
+            Settings(), TextReader.Null, static _ => null, CancellationToken.None, "none");
+        var explicitToken = await ServerTokenSource.ResolveAsync(
+            Settings(auth: "token"), TextReader.Null, static _ => null, CancellationToken.None, "none");
+        var explicitNone = await ServerTokenSource.ResolveAsync(
+            Settings(auth: "none"), TextReader.Null, static _ => null, CancellationToken.None, "token");
+        var fromEnvironment = await ServerTokenSource.ResolveAsync(
+            Settings(), TextReader.Null, static name => name == ServerTokenSource.EnvironmentVariable ? "from-environment-0123" : null, CancellationToken.None, "none");
+        var fromStdin = await ServerTokenSource.ResolveAsync(
+            Settings(tokenStdin: true), new StringReader("from-stdin-0123456789\n"), static _ => null, CancellationToken.None, "none");
+
+        Assert.Null(none.Token);
+        Assert.Equal(string.Empty, none.Error);
+        Assert.NotNull(explicitToken.Token);
+        Assert.True(explicitToken.Generated);
+        Assert.Null(explicitNone.Token);
+        Assert.Equal("from-environment-0123", fromEnvironment.Token);
+        Assert.Equal("from-stdin-0123456789", fromStdin.Token);
+    }
+
+    [Fact]
+    public void DefaultAuth_IsTokenForServerAndNoneForWebUnlessConfigured()
+    {
+        using var home = new TemporaryDirectory();
+        var crystalHome = new CrystalHome(home.Root);
+        var store = new DiskSettingsStore(crystalHome);
+        var plain = store.LoadOrCreate();
+        store.Save(plain);
+        File.WriteAllText(
+            crystalHome.ConfigPath,
+            File.ReadAllText(crystalHome.ConfigPath).Replace(
+                "{", "{ \"server\": { \"auth\": \"none\" }, \"web\": { \"auth\": \"token\" },", StringComparison.Ordinal));
+        var configured = store.Load();
+        var server = new ServerSettings { Resume = new FlagValue<string?>() };
+
+        Assert.Equal("token", server.DefaultAuth(plain));
+        Assert.Equal("none", Web().DefaultAuth(plain));
+        Assert.Equal("none", server.DefaultAuth(configured));
+        Assert.Equal("token", Web().DefaultAuth(configured));
+    }
+
     private static WebSettings Web(string? spaFallback = null) =>
         new() { Resume = new FlagValue<string?>(), SpaFallback = spaFallback };
 
