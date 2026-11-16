@@ -376,6 +376,11 @@ it speculatively, and do not reserve types or configuration for it.
   are not defined. It must not be treated as permission to add a command,
   project, public type, wire field, or server behavior until those boundaries
   are decided.
+  - Naming proposal: **Crystal Host**, with `crystal host` as the proposed
+    command name. Prefer it over `server-manager`: this would be a runtime
+    host for multiple sessions and their child processes, not a tool for
+    administering existing servers. `host` does not require a background
+    daemon deployment model.
 - Several queued follow-ups as separate user messages. Not decided. The
   follow-up queue keeps each submission as its own item, and the Queued
   panel lists them separately. Sending the queue joins every waiting item
