@@ -15,6 +15,7 @@ public static class TopicNamingPrompt
 
         Rules:
         - Prefer 3 to 8 English words and no more than 80 characters.
+        - Prefer sentence case: capitalize the first word while preserving the casing of proper nouns and code identifiers.
         - Describe the user's main goal, not implementation details.
         - Use stable, searchable wording.
         - Do not include secrets, credentials, full file contents, or personal data.

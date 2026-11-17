@@ -12,6 +12,8 @@ public sealed class TopicNamingPromptTests
     public void Text_ContainsStableTitleRules()
     {
         Assert.Contains("return only one descriptive title", TopicNamingPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("Prefer sentence case: capitalize the first word", TopicNamingPrompt.Text, StringComparison.Ordinal);
+        Assert.Contains("preserving the casing of proper nouns and code identifiers", TopicNamingPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("New conversation", TopicNamingPrompt.Text, StringComparison.Ordinal);
         Assert.Contains("secrets", TopicNamingPrompt.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("New conversation.", TopicNamingPrompt.Text, StringComparison.Ordinal);
