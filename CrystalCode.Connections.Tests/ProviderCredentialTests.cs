@@ -16,17 +16,22 @@ namespace CrystalCode.Connections.Tests;
 public sealed class ProviderCredentialTests
 {
     [Theory]
-    [InlineData(false, null)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
+    [InlineData(false, false, null, false)]
+    [InlineData(false, true, null, true)]
+    [InlineData(true, true, null, true)]
+    [InlineData(true, true, false, false)]
+    [InlineData(true, false, true, true)]
     public async Task ResponsesFactory_WritesAccountInstructionsThroughTheIntegrationHandler(
         bool multimodal,
-        bool? systemAsDeveloper)
+        bool officialEndpoint,
+        bool? systemAsDeveloper,
+        bool expectDeveloper)
     {
         var capture = new CaptureInner();
         var credential = new ProviderCredential(string.Empty, new MarkingHandler { InnerHandler = capture });
-        var settings = AccountSettings(responses: new ResponsesRequestSettings(SystemAsDeveloper: systemAsDeveloper));
+        var settings = AccountSettings(
+            responses: new ResponsesRequestSettings(SystemAsDeveloper: systemAsDeveloper),
+            baseUri: officialEndpoint ? new Uri("https://api.openai.com/v1/") : null);
         var factory = new ResponsesClientFactory();
 
         if (multimodal)
@@ -58,7 +63,7 @@ public sealed class ProviderCredentialTests
         var input = root.GetProperty("input").EnumerateArray().ToArray();
         Assert.Equal("user", input[^1].GetProperty("role").GetString());
         Assert.False(root.TryGetProperty("max_output_tokens", out _));
-        if (systemAsDeveloper == true)
+        if (expectDeveloper)
         {
             Assert.False(root.TryGetProperty("instructions", out _));
             Assert.Equal(2, input.Length);
@@ -71,6 +76,44 @@ public sealed class ProviderCredentialTests
             Assert.Single(input);
             Assert.Equal("workspace rules", root.GetProperty("instructions").GetString());
         }
+    }
+
+    [Theory]
+    [InlineData("https://api.openai.com/v1/", null, null, true)]
+    [InlineData("https://api.openai.com/v1", null, null, true)]
+    [InlineData("https://example.test/v1/", null, null, false)]
+    [InlineData("https://api.openai.com/v1/", true, null, false)]
+    [InlineData("https://api.openai.com/v1/", false, null, false)]
+    [InlineData("https://api.openai.com/v1/", null, false, false)]
+    [InlineData("https://api.openai.com/v1/", true, true, true)]
+    public void ResponsesFactory_ResolvesDeveloperDefaultForApiKey(
+        string endpoint,
+        bool? systemAsInstructions,
+        bool? systemAsDeveloper,
+        bool expected)
+    {
+        var provider = new ProviderDefinition(
+            new ProviderName("api"),
+            ProviderProtocol.Responses,
+            new Uri(endpoint),
+            new Dictionary<string, ModelSettings>
+            {
+                ["m"] = new(64000, responses: new ResponsesRequestSettings(
+                    SystemAsInstructions: systemAsInstructions,
+                    SystemAsDeveloper: systemAsDeveloper))
+            });
+        var settings = new HarnessSettings(
+            provider.Name,
+            "m",
+            CrystalCode.Engine.Approvals.ApprovalMode.Default,
+            HarnessSettings.DefaultCompactionThreshold,
+            new ProviderCatalog([provider]));
+
+        var shape = ResponsesClientFactory.CreateOptions(settings, new ProviderCredential("test-key")).RequestShape;
+
+        Assert.Equal(expected, shape.SystemAsDeveloper);
+        Assert.Equal(systemAsInstructions ?? false, shape.SystemAsInstructions);
+        Assert.False(shape.OmitSampling);
     }
 
     [Theory]
@@ -137,12 +180,13 @@ public sealed class ProviderCredentialTests
 
     private static HarnessSettings AccountSettings(
         string protocol = "responses",
-        ResponsesRequestSettings? responses = null)
+        ResponsesRequestSettings? responses = null,
+        Uri? baseUri = null)
     {
         var provider = new ProviderDefinition(
             new ProviderName("account"),
             ProviderProtocol.Parse(protocol),
-            new Uri("https://example.test/v1/"),
+            baseUri ?? new Uri("https://example.test/v1/"),
             new Dictionary<string, ModelSettings> { ["m"] = new(64000, maxTokens: 4096, responses: responses) },
             type: ProviderType.Authentication,
             integration: "example");

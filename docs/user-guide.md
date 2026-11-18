@@ -981,10 +981,10 @@ The `chatgpt` integration signs in with a ChatGPT account (the Sign in with
 ChatGPT plan-usage flow). Declare the provider and its models yourself; the
 product ships no model table and never fetches one. The integration sends the
 token only to `https://api.openai.com/v1/` and requires the `responses`
-protocol. That endpoint rejects system message items and the sampling
-fields, so by default an account provider puts system text in
-`instructions` and leaves out `temperature`, `topP`, and the output token
-cap. The model id and context size below only show the shape.
+protocol. The account endpoint accepts developer messages and rejects system
+message items. Crystal Code sends developer messages by default and omits
+`temperature`, `top_p`, and the output token cap. The model id and context
+size below only show the shape.
 
 ```json
 {
@@ -1001,32 +1001,35 @@ cap. The model id and context size below only show the shape.
 ```
 
 A model of a `responses` provider may carry a `responses` object to change
-the request shape for an endpoint. Each switch is optional, and an omitted one
-keeps the default. The example shows account-provider defaults. API-key
-providers default `systemAsInstructions` and `omitSampling` to `false`.
+the request shape. The following example explicitly opts in to developer
+messages on a compatible gateway.
 
 ```json
 "models": {
   "example-model": {
     "contextWindow": 64000,
     "responses": {
-      "systemAsInstructions": true,
-      "systemAsDeveloper": false,
-      "includeEncryptedReasoning": true,
-      "omitSampling": true
+      "systemAsDeveloper": true
     }
   }
 }
 ```
 
-`systemAsInstructions` sends system text in `instructions` instead of as
-system message items. Set `systemAsDeveloper` to `true` to send each system
-message as a developer message in `input`. This takes precedence over
-`systemAsInstructions` and lets supported models such as GPT-6.2 Sol cache
-the leading instructions. It defaults to `false` for every provider.
-`includeEncryptedReasoning` asks for encrypted reasoning
-so it can be replayed. `omitSampling` leaves out `temperature`, `topP`, and
-`max_output_tokens`. Another protocol rejects a `responses` object.
+`systemAsDeveloper` sends system messages as developer messages in `input`,
+so supported models such as GPT-6.2 Sol can cache leading instructions.
+It defaults to `true` for `https://api.openai.com/v1/` with either ChatGPT
+sign-in or an API key, and to `false` for other endpoints. An explicit
+`systemAsInstructions` keeps the legacy format unless `systemAsDeveloper`
+is explicitly set to `true`. Set `systemAsDeveloper` to `false` to use
+the legacy format with its normal defaults.
+
+With the legacy format, `systemAsInstructions` selects top-level
+`instructions` when true and system message items when false.
+`omitSampling` leaves out `temperature`, `top_p`, and
+`max_output_tokens`. Both switches default to `true` for account providers
+and `false` for API-key providers. `includeEncryptedReasoning` defaults
+to `true` and asks for encrypted reasoning so it can be replayed. Another
+protocol rejects a `responses` object.
 
 A personal and a work account use separate provider names, each with its own
 login. Then run `crystal login chatgpt-personal`.

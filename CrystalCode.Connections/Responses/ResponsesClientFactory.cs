@@ -57,7 +57,7 @@ public sealed class ResponsesClientFactory : IChatClientFactory
             httpHeaders: settings.EffectiveHttpHeaders);
     }
 
-    private static ResponsesOptions CreateOptions(
+    internal static ResponsesOptions CreateOptions(
         HarnessSettings settings,
         ProviderCredential credential)
     {
@@ -69,6 +69,13 @@ public sealed class ResponsesClientFactory : IChatClientFactory
         }
         var provider = settings.ActiveProvider;
         var model = settings.ActiveModel;
+        var shape = model.Responses;
+        var accountEndpoint = credential.Handler is not null;
+        var officialEndpoint = provider.BaseUri.AbsoluteUri is
+            "https://api.openai.com/v1/" or "https://api.openai.com/v1";
+        // Honor an existing explicit choice of system-message format.
+        var systemAsDeveloper = shape?.SystemAsDeveloper
+            ?? (shape?.SystemAsInstructions is null && officialEndpoint);
         return new ResponsesOptions(
             credential.ApiKey,
             settings.Model,
@@ -79,13 +86,11 @@ public sealed class ResponsesClientFactory : IChatClientFactory
             speed: settings.Speed,
             textTools: TextToolsFor(model),
             modelOptions: model.Options,
-            // An integration handler marks an account endpoint. It rejects system message
-            // items and sampling fields, so those default on; the model's responses
-            // switches override the defaults either way.
+            // Account endpoints reject system items and sampling fields.
             requestShape: new ResponsesRequestShape(
-                model.Responses?.SystemAsInstructions ?? credential.Handler is not null,
-                model.Responses?.IncludeEncryptedReasoning ?? true,
-                model.Responses?.OmitSampling ?? credential.Handler is not null,
-                SystemAsDeveloper: model.Responses?.SystemAsDeveloper ?? false));
+                shape?.SystemAsInstructions ?? accountEndpoint,
+                shape?.IncludeEncryptedReasoning ?? true,
+                shape?.OmitSampling ?? accountEndpoint,
+                SystemAsDeveloper: systemAsDeveloper));
     }
 }
