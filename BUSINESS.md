@@ -456,6 +456,8 @@ separate library with no terminal code. The product can:
 - use DeepSeek and OpenAI-compatible Chat Completions, OpenAI Responses,
   Anthropic Messages, native Gemini GenerateContent, and native Ollama Chat
   adapters, including user-added gateways;
+- opt in per Responses model to sending system prompts as developer messages
+  so endpoints with prefix caching can reuse stable instructions;
 - sign in to a provider with an account instead of an API key. A provider
   definition with `type` `authentication` names an authentication integration
   and lists its own models. `crystal login <provider>` and `/login` run the

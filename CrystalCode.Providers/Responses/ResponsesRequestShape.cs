@@ -12,7 +12,17 @@ namespace CrystalCode.Providers.Responses;
 /// <param name="OmitSampling">
 /// Leave out <c>temperature</c>, <c>top_p</c>, and <c>max_output_tokens</c>.
 /// </param>
+/// <param name="SystemAsDeveloper">
+/// Write system messages as developer messages in input, overriding <c>SystemAsInstructions</c>.
+/// </param>
 public sealed record ResponsesRequestShape(
     bool SystemAsInstructions = false,
     bool IncludeEncryptedReasoning = true,
-    bool OmitSampling = false);
+    bool OmitSampling = false,
+    bool SystemAsDeveloper = false)
+{
+    internal bool UseTopLevelInstructions => SystemAsInstructions && !SystemAsDeveloper;
+
+    internal string MessageRole(string role) =>
+        SystemAsDeveloper && role == "system" ? "developer" : role;
+}

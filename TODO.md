@@ -171,7 +171,8 @@ behavior stands until a specific change defines otherwise.
   method, or plugin contract for them. See MCP gaps for remote MCP server OAuth.
 - Request-shape switches for protocols other than `responses`. A model of a
   `responses` provider may carry a `responses` object (`systemAsInstructions`,
-  `includeEncryptedReasoning`, `omitSampling`) so one codec fits endpoints
+  `systemAsDeveloper`, `includeEncryptedReasoning`, `omitSampling`) so one
+  codec fits endpoints
   that differ from the public API, such as an account endpoint. The OpenAI
   compatible, Anthropic, Gemini, DeepSeek, and Ollama protocols have no such
   object, and an endpoint that rejects a field they always send cannot be

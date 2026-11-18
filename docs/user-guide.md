@@ -982,7 +982,7 @@ ChatGPT plan-usage flow). Declare the provider and its models yourself; the
 product ships no model table and never fetches one. The integration sends the
 token only to `https://api.openai.com/v1/` and requires the `responses`
 protocol. That endpoint rejects system message items and the sampling
-fields, so for an account provider the request puts system text in
+fields, so by default an account provider puts system text in
 `instructions` and leaves out `temperature`, `topP`, and the output token
 cap. The model id and context size below only show the shape.
 
@@ -1002,8 +1002,8 @@ cap. The model id and context size below only show the shape.
 
 A model of a `responses` provider may carry a `responses` object to change
 the request shape for an endpoint. Each switch is optional, and an omitted one
-keeps the default (shown here for an account provider; an API key provider
-defaults to `false`, `true`, `false`):
+keeps the default. The example shows account-provider defaults. API-key
+providers default `systemAsInstructions` and `omitSampling` to `false`.
 
 ```json
 "models": {
@@ -1011,6 +1011,7 @@ defaults to `false`, `true`, `false`):
     "contextWindow": 64000,
     "responses": {
       "systemAsInstructions": true,
+      "systemAsDeveloper": false,
       "includeEncryptedReasoning": true,
       "omitSampling": true
     }
@@ -1019,7 +1020,11 @@ defaults to `false`, `true`, `false`):
 ```
 
 `systemAsInstructions` sends system text in `instructions` instead of as
-system message items. `includeEncryptedReasoning` asks for encrypted reasoning
+system message items. Set `systemAsDeveloper` to `true` to send each system
+message as a developer message in `input`. This takes precedence over
+`systemAsInstructions` and lets supported models such as GPT-6.2 Sol cache
+the leading instructions. It defaults to `false` for every provider.
+`includeEncryptedReasoning` asks for encrypted reasoning
 so it can be replayed. `omitSampling` leaves out `temperature`, `topP`, and
 `max_output_tokens`. Another protocol rejects a `responses` object.
 

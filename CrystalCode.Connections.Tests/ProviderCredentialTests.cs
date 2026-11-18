@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Crystal.Chat;
 using Crystal.Multimodal;
 using Crystal.Multimodal.Chat;
@@ -13,19 +15,62 @@ namespace CrystalCode.Connections.Tests;
 
 public sealed class ProviderCredentialTests
 {
-    [Fact]
-    public async Task ResponsesFactory_SendsRequestsThroughTheIntegrationHandler()
+    [Theory]
+    [InlineData(false, null)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task ResponsesFactory_WritesAccountInstructionsThroughTheIntegrationHandler(
+        bool multimodal,
+        bool? systemAsDeveloper)
     {
         var capture = new CaptureInner();
         var credential = new ProviderCredential(string.Empty, new MarkingHandler { InnerHandler = capture });
-        var settings = AccountSettings();
+        var settings = AccountSettings(responses: new ResponsesRequestSettings(SystemAsDeveloper: systemAsDeveloper));
+        var factory = new ResponsesClientFactory();
 
-        using var client = (IDisposable)new ResponsesClientFactory().Create(settings, credential);
-        await ((IChatClient)client).CompleteAsync(
-            new ChatRequest([new ChatMessage(ChatRole.User, "go")]));
+        if (multimodal)
+        {
+            var client = factory.CreateMultimodal(settings, credential);
+            using var disposable = (IDisposable)client;
+            await client.CompleteAsync(new MultimodalChatRequest(
+            [
+                new MultimodalMessage(MultimodalChatRole.System, [new TextContent("workspace rules")]),
+                new MultimodalMessage(MultimodalChatRole.User, [new TextContent("go")])
+            ]));
+        }
+        else
+        {
+            var client = factory.Create(settings, credential);
+            using var disposable = (IDisposable)client;
+            await client.CompleteAsync(new ChatRequest(
+            [
+                new ChatMessage(ChatRole.System, "workspace rules"),
+                new ChatMessage(ChatRole.User, "go")
+            ]));
+        }
 
         Assert.Equal("marked", capture.Header);
         Assert.Null(capture.Authorization);
+
+        using var body = JsonDocument.Parse(Assert.IsType<string>(capture.Body));
+        var root = body.RootElement;
+        var input = root.GetProperty("input").EnumerateArray().ToArray();
+        Assert.Equal("user", input[^1].GetProperty("role").GetString());
+        Assert.False(root.TryGetProperty("max_output_tokens", out _));
+        if (systemAsDeveloper == true)
+        {
+            Assert.False(root.TryGetProperty("instructions", out _));
+            Assert.Equal(2, input.Length);
+            Assert.Equal("developer", input[0].GetProperty("role").GetString());
+            var content = input[0].GetProperty("content");
+            Assert.Equal("workspace rules", multimodal ? content[0].GetProperty("text").GetString() : content.GetString());
+        }
+        else
+        {
+            Assert.Single(input);
+            Assert.Equal("workspace rules", root.GetProperty("instructions").GetString());
+        }
     }
 
     [Theory]
@@ -90,13 +135,15 @@ public sealed class ProviderCredentialTests
             throw new InvalidOperationException("The string overload must not be reached.");
     }
 
-    private static HarnessSettings AccountSettings(string protocol = "responses")
+    private static HarnessSettings AccountSettings(
+        string protocol = "responses",
+        ResponsesRequestSettings? responses = null)
     {
         var provider = new ProviderDefinition(
             new ProviderName("account"),
             ProviderProtocol.Parse(protocol),
             new Uri("https://example.test/v1/"),
-            new Dictionary<string, ModelSettings> { ["m"] = new(64000) },
+            new Dictionary<string, ModelSettings> { ["m"] = new(64000, maxTokens: 4096, responses: responses) },
             type: ProviderType.Authentication,
             integration: "example");
         return new HarnessSettings(
@@ -126,20 +173,23 @@ public sealed class ProviderCredentialTests
 
         public bool HasVendorKeyHeader { get; private set; }
 
-        protected override Task<HttpResponseMessage> SendAsync(
+        public string? Body { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             Header = request.Headers.TryGetValues("X-Marked", out var values) ? values.Single() : null;
             Authorization = request.Headers.Authorization?.ToString();
             HasVendorKeyHeader = request.Headers.Contains("x-api-key") || request.Headers.Contains("x-goog-api-key");
-            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            Body = request.Content is { } content ? await content.ReadAsStringAsync(cancellationToken) : null;
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
             {
                 Content = new StringContent(
                     """{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}]}""",
                     System.Text.Encoding.UTF8,
                     "application/json")
-            });
+            };
         }
     }
 }

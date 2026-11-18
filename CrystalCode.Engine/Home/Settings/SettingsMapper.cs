@@ -294,7 +294,8 @@ internal static class SettingsMapper
                         ? new ResponsesRequestSettings(
                             shape.SystemAsInstructions,
                             shape.IncludeEncryptedReasoning,
-                            shape.OmitSampling)
+                            shape.OmitSampling,
+                            shape.SystemAsDeveloper)
                         : null);
             }
         }
@@ -371,7 +372,8 @@ internal static class SettingsMapper
                     {
                         SystemAsInstructions = responses.SystemAsInstructions,
                         IncludeEncryptedReasoning = responses.IncludeEncryptedReasoning,
-                        OmitSampling = responses.OmitSampling
+                        OmitSampling = responses.OmitSampling,
+                        SystemAsDeveloper = responses.SystemAsDeveloper
                     }
                     : null,
                 ServiceTiers = settings.ServiceTiers.Count == 0

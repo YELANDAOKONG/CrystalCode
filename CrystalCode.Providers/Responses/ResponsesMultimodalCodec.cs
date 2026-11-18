@@ -73,7 +73,7 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         {
             writer.WriteStartObject();
             writer.WriteString("model", options.Model);
-            if (_shape.SystemAsInstructions)
+            if (_shape.UseTopLevelInstructions)
             {
                 var instructions = string.Join(
                     "\n\n",
@@ -95,7 +95,7 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
                 request.Tools);
             foreach (var item in request.Items)
             {
-                if (_shape.SystemAsInstructions
+                if (_shape.UseTopLevelInstructions
                     && item is MultimodalMessage { Role: var role }
                     && role == MultimodalChatRole.System)
                 {
@@ -195,11 +195,11 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         }
     }
 
-    private static void WriteMessage(Utf8JsonWriter writer, MultimodalMessage message)
+    private void WriteMessage(Utf8JsonWriter writer, MultimodalMessage message)
     {
         writer.WriteStartObject();
         writer.WriteString("type", "message");
-        writer.WriteString("role", message.Role.Value);
+        writer.WriteString("role", _shape.MessageRole(message.Role.Value));
         writer.WritePropertyName("content");
         writer.WriteStartArray();
         foreach (var content in message.Contents)

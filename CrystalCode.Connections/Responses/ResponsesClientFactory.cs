@@ -85,6 +85,7 @@ public sealed class ResponsesClientFactory : IChatClientFactory
             requestShape: new ResponsesRequestShape(
                 model.Responses?.SystemAsInstructions ?? credential.Handler is not null,
                 model.Responses?.IncludeEncryptedReasoning ?? true,
-                model.Responses?.OmitSampling ?? credential.Handler is not null));
+                model.Responses?.OmitSampling ?? credential.Handler is not null,
+                SystemAsDeveloper: model.Responses?.SystemAsDeveloper ?? false));
     }
 }

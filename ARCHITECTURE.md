@@ -313,6 +313,12 @@ defaults the first and last to `true`, because an account endpoint rejects
 system message items and sampling fields. It holds no UI, no `~/.crystal` layout, and no login
 flow.
 
+The Responses model switch `systemAsDeveloper` defaults to false. When
+enabled it takes precedence over `systemAsInstructions`. Both codecs
+serialize system messages as developer messages at their existing positions
+in `input`, making leading instructions eligible for prefix caching on
+supported models. The switch is independent of sampling and reasoning options.
+
 ### CrystalCode.Authentication
 
 Authentication integrations. It ships no provider definitions: an operator

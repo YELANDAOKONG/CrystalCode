@@ -55,7 +55,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
         {
             writer.WriteStartObject();
             writer.WriteString("model", options.Model);
-            if (_shape.SystemAsInstructions)
+            if (_shape.UseTopLevelInstructions)
             {
                 var instructions = string.Join(
                     "\n\n",
@@ -73,7 +73,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
             var folded = FoldedCalls(request.Items.OfType<ToolCall>(), request.Tools);
             foreach (var item in request.Items)
             {
-                if (_shape.SystemAsInstructions && item is ChatMessage { Role: var role } && role == ChatRole.System)
+                if (_shape.UseTopLevelInstructions && item is ChatMessage { Role: var role } && role == ChatRole.System)
                 {
                     continue;
                 }
@@ -172,7 +172,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
             case ChatMessage message:
                 writer.WriteStartObject();
                 writer.WriteString("type", "message");
-                writer.WriteString("role", message.Role.Value);
+                writer.WriteString("role", _shape.MessageRole(message.Role.Value));
                 writer.WriteString("content", message.Text);
                 writer.WriteEndObject();
                 break;

@@ -14,7 +14,11 @@ namespace CrystalCode.Engine.Configuration;
 /// <param name="OmitSampling">
 /// Leave out <c>temperature</c>, <c>top_p</c>, and the output token cap.
 /// </param>
+/// <param name="SystemAsDeveloper">
+/// Send system messages as developer messages in input, overriding <c>SystemAsInstructions</c>.
+/// </param>
 public sealed record ResponsesRequestSettings(
     bool? SystemAsInstructions = null,
     bool? IncludeEncryptedReasoning = null,
-    bool? OmitSampling = null);
+    bool? OmitSampling = null,
+    bool? SystemAsDeveloper = null);

@@ -7,4 +7,6 @@ internal sealed class ResponsesRequestDocument
     public bool? IncludeEncryptedReasoning { get; set; }
 
     public bool? OmitSampling { get; set; }
+
+    public bool? SystemAsDeveloper { get; set; }
 }
