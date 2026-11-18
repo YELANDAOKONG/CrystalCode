@@ -12,6 +12,7 @@ public sealed record ChildSessionDocument
     public string Status { get; init; } = "interrupted";
     public string? StopReason { get; init; }
     public string SystemPrompt { get; init; } = string.Empty;
+    public DateTimeOffset? PromptClock { get; init; }
     public string[] Tools { get; init; } = [];
     public AgentModelSettings Model { get; init; } = new();
     public SessionItemDocument[] Items { get; init; } = [];

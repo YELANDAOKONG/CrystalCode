@@ -137,6 +137,8 @@ separate library with no terminal code. The product can:
   Optional microcompaction, off unless `microCompaction` is set, clears old
   successful tool results before each model call. `/compact micro` toggles it
   or sets `on` / `off` and writes `config.json`. It does not summarize.
+  A side question may prune its own copy without changing the main
+  conversation's context accounting.
   Resource trimming, on by default, bounds the resources a model request
   carries (images today) so a session that holds many tool-returned images
   does not exceed the provider's request size. A provider definition may set
@@ -677,8 +679,9 @@ with a child are not implemented.
 Children start with their own role prompt, applicable workspace instructions,
 and the delegated task, without parent history or pasted images. Their model,
 thinking, context window, service tier, and speed are resolved at creation
-and retained when continued. Without a configured model they inherit the
-parent's current choices. Explicit models must exist and have credentials;
+and retained when continued. The system prompt's clock is a snapshot from
+the child's first run, reused on continuation. Without a configured model
+they inherit the parent's current choices. Explicit models must exist and have credentials;
 an unavailable Agent is omitted with an English diagnostic. Per-model options
 without an explicit model are ignored. Invalid gears or slots are diagnosed
 and fall back without disabling the Agent.

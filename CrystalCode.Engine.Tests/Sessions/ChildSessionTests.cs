@@ -226,7 +226,12 @@ public sealed class ChildSessionTests
         await session.Session.StartAsync(CancellationToken.None);
         await session.RunTurnAsync("first delegation");
         var original = session.ReadSaved();
-        var childId = Assert.Single(original.Children).Id;
+        var originalChild = Assert.Single(original.Children);
+        Assert.NotNull(originalChild.PromptClock);
+        var childId = originalChild.Id;
+        // Represent a continuation well after the stored clock was sampled.
+        var promptClock = new DateTimeOffset(2025, 2, 3, 4, 5, 6, TimeSpan.FromHours(8));
+        original.Children[0] = originalChild with { PromptClock = promptClock };
         var arguments = JsonSerializer.Serialize(new { agent = "explore", label = "continue", prompt = "Second question", sessionId = childId });
         using var resumed = new HeadlessSession(new ScriptedStreamingClient(Tool("task", arguments),
                 Tool("read", """{"path":"missing.txt"}"""), Text("second answer"), Text("parent")),
@@ -236,6 +241,10 @@ public sealed class ChildSessionTests
         var saved = resumed.ReadSaved();
         var child = Assert.Single(saved.Children);
         Assert.Equal(childId, child.Id);
+        Assert.Equal(promptClock, child.PromptClock);
+        var system = Assert.Single(child.Items, item => item.Role == "system");
+        Assert.Contains("Today's date: Monday Feb 3, 2025", system.Text, StringComparison.Ordinal);
+        Assert.Contains("Local time: 04:05:06 +08:00", system.Text, StringComparison.Ordinal);
         Assert.Contains(child.Archive, item => item.Text == "first answer");
         Assert.Contains(child.Archive, item => item.Text == "second answer");
         Assert.Equal(60, child.CumulativeUsage!.InputTokenCount);

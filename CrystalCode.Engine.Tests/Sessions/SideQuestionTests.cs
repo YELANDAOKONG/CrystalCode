@@ -3,6 +3,8 @@ using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
 
+using CrystalCode.Engine.Compaction;
+using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Home;
 using CrystalCode.Engine.Sessions;
@@ -13,6 +15,46 @@ namespace CrystalCode.Engine.Tests.Sessions;
 
 public sealed class SideQuestionTests
 {
+    [Fact]
+    public async Task Btw_MicrocompactionPreservesTheMainContextAnchor()
+    {
+        var first = new SessionItemDocument { Kind = "message", Role = "user", Text = "Read a file." };
+        var call = new SessionItemDocument { Kind = "tool_call", CallId = "read-1", Name = "read", Arguments = "{}" };
+        var result = new SessionItemDocument { Kind = "tool_result", CallId = "read-1", Text = "Archived output" };
+        var resume = new SessionDocument
+        {
+            Items = [first],
+            Archive = [first, call, result]
+        };
+        var settings = HeadlessSession.ScriptedSettings().WithMicroCompaction(
+            new MicroCompactionSettings(true, protectTurns: 1, protectTokens: 0, minimumTokens: 0));
+        var client = new ScriptedStreamingClient(
+            TextRound("Main answer.", new TokenUsage(10, 3)),
+            TextRound("Side answer."),
+            TextRound("Next main answer.", new TokenUsage(10, 3)));
+        using var headless = new HeadlessSession(client, resume, settings: settings);
+        await headless.Session.StartAsync(CancellationToken.None);
+        await headless.RunTurnAsync("Continue.");
+
+        await headless.Session.SubmitAsync("/btw why", CancellationToken.None);
+        await headless.Session.SideQuestionTask;
+        Assert.Contains(client.LastRequest!.Items.OfType<ToolResult>(),
+            item => item.Text == ContextCompactor.OmittedResultText);
+
+        // Leave room for the short provider-reported prefix. Estimating the
+        // whole transcript instead charges the larger local system prompt.
+        var ceiling = ContextAccountant.CompactLimit(
+            settings.ContextWindow, settings.CompactionThreshold, settings.ActiveModel.MaxTokens, settings.ReservedOutputTokens);
+        var estimatedTail = ceiling - 100;
+        var tailLength = (int)(estimatedTail * TokenEstimator.CharactersPerToken);
+        await headless.Session.SubmitAsync(new string('x', tailLength), CancellationToken.None);
+        await headless.Session.TurnTask!;
+        await headless.Session.FinishTurnAsync();
+
+        Assert.Equal(3, client.RequestCount);
+        Assert.DoesNotContain(headless.Observer.Events, item => item is CompactionStarted);
+    }
+
     [Fact]
     public async Task Btw_AnswersFromTheTranscriptWithoutSavingOrTools()
     {

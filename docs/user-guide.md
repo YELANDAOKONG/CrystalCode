@@ -1536,6 +1536,10 @@ unavailable Agent is omitted with an English note. Model-specific
 options without an explicit model are ignored. An invalid gear or slot
 is diagnosed and falls back; the Agent stays available.
 
+The child's system prompt keeps its initial date and local time across
+continuations, including after the parent session is resumed. A child saved
+before clock snapshots were introduced captures one on its next run.
+
 A child run has no model-call, tool-call, or duration limit of its own by
 default, for any Agent. It draws on the parent turn's shared execution
 budget, so a long-running child stops only when that budget is spent.

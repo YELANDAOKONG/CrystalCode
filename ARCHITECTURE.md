@@ -604,6 +604,10 @@ concurrency slot.
 
 Child clients are cached independently of parent, review, and compaction
 clients by resolved provider, model, service tier, speed, and fitted output cap.
+The first run saves a local clock snapshot, including its offset, in the
+child document. Continuations reuse it when rendering date and time
+placeholders, while recomposing live instructions and approval and directory
+context. Older child documents sample the clock on their first continuation.
 Changing thinking does not create a client. Parent model changes leave child
 clients alive. Child images require both model `imageInput` and adapter image
 capabilities. The multimodal path reuses `MultimodalStreamingTurn` and the
@@ -1834,8 +1838,9 @@ The placeholder that replaces them is not subtracted from that estimate.
 User text, assistant text, and
 failed results stay. The walk stops at the previous summary. The
 archive, the screen, resume, fork, and export keep the original tool
-text. A rewrite is saved on the model transcript. The following compact
-decision then uses that transcript's estimate, because the previous
+text. A rewrite is saved on the model transcript. Side questions prune
+their outgoing copy without clearing the main conversation's usage anchor.
+The following compact decision uses the rewritten transcript's estimate, because the previous
 provider usage still counts the removed text. Microcompaction is off
 when `microCompaction` is omitted. `/compact micro` toggles it, and
 `on` or `off` sets it, writes `config.json`, and does not summarize.

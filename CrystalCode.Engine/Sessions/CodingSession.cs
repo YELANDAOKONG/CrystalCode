@@ -404,7 +404,7 @@ public sealed class CodingSession : ITurnObserver
             entered = true;
             _childOrigin.Value = $"{agent} / {child.Label} / {child.Id}";
             _childPublish.Value = Emit;
-            child = child with { Status = "running" };
+            child = child with { Status = "running", PromptClock = child.PromptClock ?? DateTimeOffset.Now };
             _children.Set(child);
             Publish(new ChildSessionChanged(child, invocation));
             if (child.Model.Provider is null || child.Model.Model is null)
@@ -422,6 +422,7 @@ public sealed class CodingSession : ITurnObserver
                 ? CrystalCode.Engine.Skills.SkillGuidance.Render(_skills) : string.Empty;
             var facts = PromptContext.Create(_workspace.Root, selectedModel.Provider.Value, selectedModel.Model,
                 childPlan ? "plan" : "work", skills, _prompts.Instructions,
+                now: child.PromptClock,
                 sessionId: child.Id,
                 approval: _approval.Value,
                 directories: directories,
@@ -7080,9 +7081,20 @@ public sealed class CodingSession : ITurnObserver
 
     private async Task CompactIfNeededAsync(TurnResult result, CancellationToken cancellationToken)
     {
-        var changed = TryMicrocompact(_transcript, out _);
+        var pruned = Microcompact(_transcript);
+        var changed = !ReferenceEquals(pruned, _transcript);
+        if (changed)
+        {
+            _contextAnchor = null;
+            _transcript.Clear();
+            _transcript.AddRange(pruned);
+            BindReviewConversation();
+            RememberCompactedUsage();
+            SaveSession();
+        }
+
         var usage = changed ? null : result.Usage ?? _ledger.Usage;
-        if (!NeedsCompaction(_transcript, usage, changed ? null : _contextAnchor))
+        if (!NeedsCompaction(_transcript, usage, _contextAnchor))
         {
             return;
         }
@@ -7102,16 +7114,18 @@ public sealed class CodingSession : ITurnObserver
         // would let the turn clear the source it then copies from.
         _parentModelContext = transcript;
         _reviewContext.Conversation = transcript;
-        var changed = TryMicrocompact(transcript, out var current);
+        var current = Microcompact(transcript);
+        var changed = !ReferenceEquals(current, transcript);
         if (changed)
         {
+            _contextAnchor = null;
             CloseRecallWindow();
         }
 
         if (!NeedsCompaction(
                 current,
                 changed || _parentContextEstimated ? null : ShownUsage(),
-                changed ? null : _contextAnchor))
+                _contextAnchor))
         {
             return changed
                 ? new CompactionOutcome([.. current], CompactionKind.Applied)
@@ -8986,47 +9000,21 @@ public sealed class CodingSession : ITurnObserver
     }
 
     /// <summary>
-    /// Replaces old successful tool results when microcompaction is on.
-    /// A rewritten session transcript is saved. A copy, such as a side
-    /// question, is pruned without writing it back. After a rewrite the
-    /// caller must judge the new estimate: the previous provider usage
-    /// still counts the removed text.
+    /// Projects old successful tool results out of the supplied transcript.
+    /// Main-turn callers invalidate their usage anchor when applying a rewrite,
+    /// because the previous provider report still counts the removed text.
     /// </summary>
-    private bool TryMicrocompact(IReadOnlyList<ChatItem> transcript, out IReadOnlyList<ChatItem> pruned)
+    private IReadOnlyList<ChatItem> Microcompact(IReadOnlyList<ChatItem> transcript)
     {
-        pruned = transcript;
         var settings = _settings.MicroCompaction;
-        if (!settings.Enabled)
-        {
-            return false;
-        }
-
-        var next = ToolResultPruner.Prune(
-            transcript,
-            ContextCompactor.OmittedResultText,
-            settings.ProtectTokens,
-            settings.MinimumTokens,
-            settings.ProtectTurns);
-        if (ReferenceEquals(next, transcript))
-        {
-            return false;
-        }
-
-        // Removed tool text is still inside the last provider report.
-        _contextAnchor = null;
-        if (ReferenceEquals(transcript, _transcript))
-        {
-            _transcript.Clear();
-            _transcript.AddRange(next);
-            BindReviewConversation();
-            RememberCompactedUsage();
-            SaveSession();
-            pruned = _transcript;
-            return true;
-        }
-
-        pruned = next;
-        return true;
+        return settings.Enabled
+            ? ToolResultPruner.Prune(
+                transcript,
+                ContextCompactor.OmittedResultText,
+                settings.ProtectTokens,
+                settings.MinimumTokens,
+                settings.ProtectTurns)
+            : transcript;
     }
 
     private void ChangeResourceTrim(string? argument)
@@ -12942,8 +12930,7 @@ public sealed class CodingSession : ITurnObserver
         ContextCompactor compactor,
         CancellationToken cancellationToken)
     {
-        var conversation = SideConversation(ReconcilePendingToolCalls(sideBase));
-        _ = TryMicrocompact(conversation, out conversation);
+        var conversation = Microcompact(SideConversation(ReconcilePendingToolCalls(sideBase)));
         var composed = SideQuestion.Compose(conversation, prior, question);
         if (!NeedsCompaction(composed, null))
         {
