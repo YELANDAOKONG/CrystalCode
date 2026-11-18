@@ -3,6 +3,7 @@ using Crystal.Tools;
 using CrystalCode.Display.Paint;
 using CrystalCode.Display.Transcript;
 using CrystalCode.Engine.Compaction;
+using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
 
@@ -93,6 +94,13 @@ public static class TranscriptReplay
         {
             kind = TranscriptKind.Summary;
             text = message.Text[CompactionPrompt.Marker.Length..].TrimStart('\r', '\n').Trim();
+            return true;
+        }
+
+        if (ErrorWritten.ArchivedTurnFailure(message) is { } failure)
+        {
+            kind = TranscriptKind.Error;
+            text = failure;
             return true;
         }
 

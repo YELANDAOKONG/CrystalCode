@@ -719,6 +719,21 @@ internal sealed class SessionUpdates
             var id = $"replay-{replay}-{message}";
             switch (item)
             {
+                case ChatMessage failed when ErrorWritten.ArchivedTurnFailure(failed) is { } failure:
+                    if (_notices)
+                    {
+                        Notice("error", failure, null, "HistoryReplayed");
+                    }
+                    else
+                    {
+                        Update("agent_message_chunk", "HistoryReplayed", writer =>
+                        {
+                            TextContent(writer, failure);
+                            writer.WriteString("messageId", id);
+                        });
+                    }
+
+                    break;
                 case ChatMessage summary when CompactionSelection.IsSummary(summary):
                     if (_compaction)
                     {

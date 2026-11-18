@@ -526,6 +526,10 @@ public static class WireWriter
         writer.WriteStartObject();
         switch (item)
         {
+            case ChatMessage message when ErrorWritten.ArchivedTurnFailure(message) is { } failure:
+                writer.WriteString("kind", "turn_failure");
+                writer.WriteString("text", failure);
+                break;
             case ChatMessage message:
                 writer.WriteString("kind", "message");
                 writer.WriteString("role", message.Role.Value);

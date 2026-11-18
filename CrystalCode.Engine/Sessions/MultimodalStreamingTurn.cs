@@ -305,7 +305,7 @@ public sealed class MultimodalStreamingTurn
             // Any other cancellation, such as an HTTP client timeout, is a
             // failed request rather than an interrupt.
             _observer?.OnModelRoundClosed();
-            _observer?.OnFault(exception.Message);
+            _observer?.OnFault(exception);
             return Create(
                 TurnStopReason.Failed,
                 modelCallCount,

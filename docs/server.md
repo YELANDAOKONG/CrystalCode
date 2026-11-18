@@ -438,7 +438,7 @@ unwrapped, so a child's text arrives as `stream.text` with a `source`. Every
 | `PursueChanged`, `PursueChecked` | `pursue.changed` (`pursue`: null, or `objective`, `status`, `phase`, `reasonCode`, `reason`, `checks`, `continuations`, `stalls`, `nextStep`), `pursue.checked` (`index`, `verdict`, `reason`, `nextStep`, `evidence`, `usage`). `/pursue start` and `resume` run as one turn: one `turn.started` and one `turn.finished`, with stop reasons `pursue_blocked` and `pursue_limit_reached` in addition to the usual ones. Activity values `checking_objective` and `waiting_for_task` appear while the checker runs or a background task is awaited |
 | `HistoryReplayed`, `ConversationCleared` | `conversation.replayed`, `conversation.cleared` |
 | `CompactionStarted`, `CompactionFinished` | `compaction.started` (`id`, `manual`), `compaction.finished` (`id`, `status`: `completed`, `unchanged`, `failed`, or `cancelled`; `summary`, the stored summary of a completed compaction or null; `shown`, whether the operator's summary display setting draws it) |
-| `NoteWritten`, `ErrorWritten` | `note`, `error` |
+| `NoteWritten`, `ErrorWritten` | `note` (`text`), `error` (`text`, `turnFailure`) |
 | `HelpRequested`, `StatusReported`, `StatsReported`, `ToolsListed`, `TodosListed`, `DocumentWritten` | `report.help`, `report.status`, `report.stats`, `report.tools`, `report.todos`, `report.document` (`document`: `title` and `blocks`, each with `type` of `paragraph`, `keyValues`, `table`, or `list`, plus `columns`, `rows`, `lines`, and `omitted`) |
 | `SideQuestionSnapshot` | `side.changed` |
 | `ApprovalPassed`, `ApprovalReviewing` | `approval.passed`, `approval.reviewing` (with stage `primary` or `extended`) |
@@ -481,6 +481,10 @@ Delivery: state events go to every client. Reports, `child.view`, and the
 notes and errors a request produced go only to the client that sent that
 request. A running turn, a child, and a queued follow-up have no origin, so
 everything they produce goes to every client.
+An `error` with `turnFailure: true` carries the shared, host-authored failure
+explanation. It ends the live round and appends a conversation item with
+`kind: "turn_failure"` and `text`. The same item is present in snapshots and
+conversation replay.
 
 ## Snapshot
 

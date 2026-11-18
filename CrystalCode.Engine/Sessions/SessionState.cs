@@ -85,6 +85,11 @@ public sealed class SessionState
                 // The archive keeps the summary, so resume and fork replay show it.
                 _conversation.Add(new ChatMessage(ChatRole.System, summary));
                 break;
+            case ErrorWritten { TurnFailure: true } error:
+                _turnActive = false;
+                CommitRound();
+                _conversation.Add(error.ToArchiveMessage());
+                break;
             case StatusFieldsChanged fields:
                 _statusFields = fields.Fields;
                 break;

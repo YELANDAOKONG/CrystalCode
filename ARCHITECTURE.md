@@ -973,6 +973,13 @@ Every compaction summary, manual or automatic and whether or not it is
 shown, is also appended to the archive as an `## Earlier context` system
 message, so fork replay, resume, and export show the same block again. A
 child's summary goes into the child's archive the same way.
+When an observed parent turn fault ends the turn as failed, the engine
+records one host-authored failure explanation in the archive as a system
+item headed `## Turn failed`. The engine classifies the fault using known
+conditions and keeps provider response bodies and exception text out of the
+record. Live display, snapshots, and archive replay show the same error.
+The record stays out of model context and side questions. Ordinary notes
+and command errors remain transient.
 `showCompactionSummary` and `showAutomaticCompactionSummary` decide only
 whether a front end draws the summary when it is written:
 `CompactionFinished` carries the summary and a `Shown` flag. Side questions

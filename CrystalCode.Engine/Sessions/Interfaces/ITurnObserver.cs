@@ -34,4 +34,6 @@ public interface ITurnObserver
     void OnContextAnchored(ContextAnchor anchor) { }
 
     void OnFault(string message);
+
+    void OnFault(Exception exception) => OnFault(exception.Message);
 }

@@ -77,7 +77,7 @@ public static class WireEvents
     /// go to everyone.
     /// </summary>
     public static bool IsReply(SessionEvent sessionEvent) => sessionEvent is NoteWritten
-        or ErrorWritten
+        or ErrorWritten { TurnFailure: false }
         or HelpRequested
         or StatusReported
         or StatsReported
@@ -257,6 +257,7 @@ public static class WireEvents
                 break;
             case ErrorWritten error:
                 writer.WriteString("text", error.Text);
+                writer.WriteBoolean("turnFailure", error.TurnFailure);
                 break;
             case HelpRequested help:
                 WireWriter.Commands(writer, "builtIn", BuiltInHelp());

@@ -147,6 +147,27 @@ public static class SessionRetry
         }
     }
 
+    internal static string DescribeFinalFault(Exception exception)
+    {
+        var fault = FindFault(exception);
+        if (IsOverflow(fault, CombinedText(exception)))
+        {
+            return "The model request exceeded the context window.";
+        }
+
+        return (fault?.StatusCode ?? (int?)(exception as HttpRequestException)?.StatusCode) switch
+        {
+            401 or 403 => "The model provider denied access. Check the configured credentials and model access.",
+            404 => "The model provider could not find the requested model or endpoint.",
+            408 or 504 => "The request timed out.",
+            429 => "The model provider rate limit was reached.",
+            >= 500 and < 600 => "The model provider returned a server error.",
+            _ when exception is TimeoutException or OperationCanceledException => "The request timed out.",
+            _ when exception is HttpRequestException { StatusCode: null } => "The model provider could not be reached.",
+            _ => "The model request failed."
+        };
+    }
+
     private static ChatProviderException? FindFault(Exception exception)
     {
         for (var current = exception; current is not null; current = current.InnerException)

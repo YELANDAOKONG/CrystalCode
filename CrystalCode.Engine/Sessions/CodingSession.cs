@@ -1287,6 +1287,7 @@ public sealed class CodingSession : ITurnObserver
     private bool _turnActive;
     private string? _turnUserText;
     private string? _turnFault;
+    private string? _turnFailureSummary;
     private readonly object _recallGate = new();
     private bool _recallOpen;
     private bool _recallPending;
@@ -11369,6 +11370,7 @@ public sealed class CodingSession : ITurnObserver
 
         _turnUserText = message;
         _turnFault = null;
+        _turnFailureSummary = null;
         _turnModelCallsBaseline = _ledger.ModelCalls;
         _turnToolCallsBaseline = _ledger.ToolCalls;
         _parentModelContext = null;
@@ -12393,7 +12395,8 @@ public sealed class CodingSession : ITurnObserver
         var kept = new List<ChatItem>(body.Count);
         foreach (var item in body)
         {
-            if (CompactionSelection.IsSummary(item) && seenTurn)
+            if (ErrorWritten.ArchivedTurnFailure(item) is not null
+                || (CompactionSelection.IsSummary(item) && seenTurn))
             {
                 continue;
             }
@@ -12598,7 +12601,8 @@ public sealed class CodingSession : ITurnObserver
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             failure = exception.Message;
-            Error(exception.Message);
+            CloseRecallWindow();
+            _turnFailureSummary = "The turn encountered an unexpected error.";
         }
         finally
         {
@@ -12639,6 +12643,18 @@ public sealed class CodingSession : ITurnObserver
             }
         }
 
+        if (stop == TurnStopReason.Failed && _turnFailureSummary is { } summary)
+        {
+            PublishRecallIfStripped();
+            var recorded = new ErrorWritten(summary) { TurnFailure = true };
+            lock (_archiveGate)
+            {
+                _archive.Add(recorded.ToArchiveMessage());
+            }
+
+            Error(recorded);
+        }
+
         try
         {
             await _hooks.OnTurnFinishedAsync(
@@ -12659,6 +12675,7 @@ public sealed class CodingSession : ITurnObserver
 
         _turnUserText = null;
         _turnFault = null;
+        _turnFailureSummary = null;
         PublishRecallIfStripped();
         if (result is null)
         {
@@ -12747,11 +12764,13 @@ public sealed class CodingSession : ITurnObserver
         Publish(new NoteWritten(text));
     }
 
-    private void Error(string text)
+    private void Error(string text) => Error(new ErrorWritten(text));
+
+    private void Error(ErrorWritten error)
     {
         CloseRecallWindow();
-        _inputCapture.Value?.Fail(text);
-        Publish(new ErrorWritten(text));
+        _inputCapture.Value?.Fail(error.Text);
+        Publish(error);
     }
 
     private void SetActivity(SessionActivity activity)
@@ -12835,11 +12854,19 @@ public sealed class CodingSession : ITurnObserver
 
     void ITurnObserver.OnContextAnchored(ContextAnchor anchor) => _contextAnchor = anchor;
 
-    void ITurnObserver.OnFault(string message)
+    void ITurnObserver.OnFault(string message) =>
+        CaptureTurnFault(message, message == CandidateRound.PauseLimitFault
+            ? CandidateRound.PauseLimitFault
+            : "The model returned an unexpected finish reason.");
+
+    void ITurnObserver.OnFault(Exception exception) =>
+        CaptureTurnFault(exception.Message, SessionRetry.DescribeFinalFault(exception));
+
+    private void CaptureTurnFault(string message, string summary)
     {
         CloseRecallWindow();
         _turnFault = message;
-        Error(message);
+        _turnFailureSummary = summary;
         var rawNote = _hooks.TakeRawNote();
         if (rawNote is not null)
         {

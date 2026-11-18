@@ -39,6 +39,37 @@ public sealed class ServerSessionTests
     }
 
     [Fact]
+    public async Task TurnFailure_IsSharedAndRestoredBySnapshotAndResume()
+    {
+        const string providerDetail = "private provider diagnostic";
+        await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false,
+            [new ChatCandidateCompleted(0, new FinishReason(providerDetail))]));
+        await fixture.WaitReadyAsync();
+        using var events = await fixture.OpenEventsAsync(fixture.Http);
+
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "hi" });
+        var error = await events.WaitForAsync("error");
+        await events.WaitForAsync("turn.finished");
+        Assert.False(error.TryGetProperty("target", out _));
+        var data = error.GetProperty("data");
+        Assert.True(data.GetProperty("turnFailure").GetBoolean());
+        Assert.DoesNotContain(providerDetail, data.GetRawText(), StringComparison.Ordinal);
+
+        var snapshot = await fixture.GetAsync(fixture.Http, "/snapshot");
+        var failure = Assert.Single(snapshot.GetProperty("conversation").EnumerateArray(),
+            item => item.GetProperty("kind").GetString() == "turn_failure");
+        Assert.Equal(data.GetProperty("text").GetString(), failure.GetProperty("text").GetString());
+
+        var id = snapshot.GetProperty("sessionId").GetString();
+        await fixture.PostAsync(fixture.Http, "/input", new { text = "/clear" });
+        await fixture.PostAsync(fixture.Http, "/input", new { text = $"/resume {id}" });
+        var replay = await events.WaitForAsync("conversation.replayed");
+        var restored = Assert.Single(replay.GetProperty("data").GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("kind").GetString() == "turn_failure");
+        Assert.Equal(failure.GetProperty("text").GetString(), restored.GetProperty("text").GetString());
+    }
+
+    [Fact]
     public async Task Events_ResumeAfterASequenceWithoutRepeats()
     {
         await using var fixture = await ServerFixture.StartAsync(new ScriptedModel(false, TextRound("one"), TextRound("two")));
