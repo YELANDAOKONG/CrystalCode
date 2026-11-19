@@ -21,20 +21,16 @@ internal sealed class ProtocolRequestTracking : IDisposable
 
     public ProtocolOptions Options { get; }
 
-    public void OnSend(HttpRequestMessage request)
+    public void RecordAttempts(HttpRequestMessage request)
     {
         if (Options.ActiveRequest is null)
         {
             return;
         }
 
-        _attempts++;
-        request.Options.TryGetValue(ProviderHttpRequestOptions.AdditionalAttempt, out var prepareRetry);
-        request.Options.Set(ProviderHttpRequestOptions.AdditionalAttempt, retry =>
-        {
-            _attempts++;
-            prepareRetry?.Invoke(retry);
-        });
+        _attempts = request.Options.TryGetValue(ProviderHttpRequestOptions.InferenceAttempts, out var attempts)
+            ? attempts
+            : 1;
     }
 
     public void Observe(JsonElement root)

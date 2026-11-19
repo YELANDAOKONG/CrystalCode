@@ -30,12 +30,13 @@ internal static class ProtocolFaults
         string body,
         string vendorName,
         string phase,
-        Func<string, string?, Exception?, Exception> create)
+        Func<string, string?, Exception?, Exception> create,
+        Action<JsonElement> observe)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(vendorName);
         ArgumentException.ThrowIfNullOrWhiteSpace(phase);
         ArgumentNullException.ThrowIfNull(create);
-        if (CompatibleWire.TryReadError(body, out var code, out var providerMessage))
+        if (CompatibleWire.TryReadError(body, out var code, out var providerMessage, observe))
         {
             return create(Describe(vendorName, phase, code, providerMessage), code, null);
         }

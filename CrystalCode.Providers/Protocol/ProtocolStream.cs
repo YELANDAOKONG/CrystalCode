@@ -18,16 +18,18 @@ internal static class ProtocolStream
         string vendorName,
         Func<JsonElement, T?> readCompletion,
         Func<string, string?, Exception?, Exception> create,
+        Action<JsonElement> observe,
         CancellationToken cancellationToken) where T : class
     {
         await using var stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream, Encoding.UTF8);
-        await foreach (var data in ReadDataAsync(reader, jsonLines: false, vendorName, create, cancellationToken)
+        await foreach (var data in ReadDataAsync(reader, jsonLines: false, vendorName, create, observe, cancellationToken)
             .ConfigureAwait(false))
         {
             try
             {
                 using var document = JsonDocument.Parse(data);
+                observe(document.RootElement);
                 if (readCompletion(document.RootElement) is { } result)
                 {
                     return result;
@@ -47,6 +49,7 @@ internal static class ProtocolStream
         bool jsonLines,
         string vendorName,
         Func<string, string?, Exception?, Exception> create,
+        Action<JsonElement> observe,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(reader);
@@ -62,7 +65,7 @@ internal static class ProtocolStream
             {
                 var body = await ReadRemainderAsync(reader, line, cancellationToken)
                     .ConfigureAwait(false);
-                throw ProtocolFaults.FromBody(body, vendorName, "stream", create);
+                throw ProtocolFaults.FromBody(body, vendorName, "stream", create, observe);
             }
 
             if (!jsonLines && !line.StartsWith("data:", StringComparison.Ordinal))
@@ -80,7 +83,7 @@ internal static class ProtocolStream
             {
                 var body = await ReadRemainderAsync(reader, data, cancellationToken)
                     .ConfigureAwait(false);
-                throw JsonLineBody(body, vendorName, create);
+                throw JsonLineBody(body, vendorName, create, observe);
             }
 
             yield return data;
@@ -96,9 +99,10 @@ internal static class ProtocolStream
     private static Exception JsonLineBody(
         string body,
         string vendorName,
-        Func<string, string?, Exception?, Exception> create)
+        Func<string, string?, Exception?, Exception> create,
+        Action<JsonElement> observe)
     {
-        if (CompatibleWire.TryReadError(body, out var code, out var providerMessage))
+        if (CompatibleWire.TryReadError(body, out var code, out var providerMessage, observe))
         {
             return create(
                 ProtocolFaults.Describe(vendorName, "stream", code, providerMessage),

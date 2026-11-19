@@ -87,6 +87,8 @@ public sealed class ChatGptHandlerTests
         Assert.Equal(["payload", "payload"], inference.Bodies);
         Assert.Equal(["first-attempt", "second-attempt"], inference.RequestIds);
         Assert.Equal(1, fixture.Server.RefreshCount);
+        Assert.True(request.Options.TryGetValue(ProviderHttpRequestOptions.InferenceAttempts, out var attempts));
+        Assert.Equal(2, attempts);
     }
 
     [Fact]
@@ -103,21 +105,34 @@ public sealed class ChatGptHandlerTests
         Assert.Equal(2, inference.Authorizations.Count);
     }
 
-    [Fact]
-    public async Task Send_ExplainsARejectedRefreshTokenWithoutLeakingIt()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Send_ExplainsARejectedRefreshTokenAndCountsInferenceOnly(bool rejectedByInference)
     {
         using var fixture = new ChatGptFixture();
         await fixture.SignInAsync();
         var record = await fixture.ReadRecordAsync();
         fixture.Server.RefreshError = "invalid_grant";
-        using var client = Client(fixture, new InferenceServer());
-        fixture.Clock.Advance(TimeSpan.FromMinutes(59));
+        var inference = new InferenceServer { RejectToken = rejectedByInference ? record.AccessToken : null };
+        using var client = Client(fixture, inference);
+        if (!rejectedByInference)
+        {
+            fixture.Clock.Advance(TimeSpan.FromMinutes(59));
+        }
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/responses")
+        {
+            Content = Body("x")
+        };
 
         var error = await Assert.ThrowsAsync<AuthenticationFailedException>(
-            () => client.PostAsync("https://api.openai.com/v1/responses", Body("x")));
+            () => client.SendAsync(request));
 
         Assert.Contains("crystal login chatgpt-test", error.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(record.RefreshToken, error.Message, StringComparison.Ordinal);
+        Assert.True(request.Options.TryGetValue(ProviderHttpRequestOptions.InferenceAttempts, out var attempts));
+        Assert.Equal(rejectedByInference ? 1 : 0, attempts);
+        Assert.Equal(inference.Authorizations.Count, attempts);
     }
 
     [Fact]

@@ -557,20 +557,38 @@ public sealed class ResponsesProviderTests
         Assert.Null(exception.ErrorCode);
     }
 
-    [Fact]
-    public async Task StreamAsync_ThrowsJsonErrorBody()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Stream_ThrowsJsonErrorBodyAndReportsItsUsage(bool buffered)
     {
         var handler = new RecordingHandler(JsonResponse.Create(
-            """{"error":{"message":"too many images","code":"invalid_request_error"}}"""));
+            """
+            {
+              "error": {"message":"too many images","code":"invalid_request_error"},
+              "usage": {"input_tokens":100,"input_tokens_details":{"cached_tokens":70}}
+            }
+            """));
         using var http = new HttpClient(handler);
+        var usage = new List<ProviderRequestUsage>();
         using var provider = new ResponsesProvider(
-            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/")),
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/"),
+                requestShape: new ResponsesRequestShape(CompleteOverStream: buffered))
+            {
+                RequestContext = () => new("main", null, usage.Add)
+            },
             http);
+        var request = new ChatRequest([new ChatMessage(ChatRole.User, "Hi")]);
 
         var exception = await Assert.ThrowsAsync<ResponsesException>(async () =>
         {
-            await foreach (var streamEvent in provider.StreamAsync(
-                new ChatRequest([new ChatMessage(ChatRole.User, "Hi")])))
+            if (buffered)
+            {
+                await provider.CompleteAsync(request);
+                return;
+            }
+
+            await foreach (var streamEvent in provider.StreamAsync(request))
             {
                 _ = streamEvent;
             }
@@ -579,6 +597,7 @@ public sealed class ResponsesProviderTests
         Assert.Equal("invalid_request_error", exception.ErrorCode);
         Assert.Contains("too many images", exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("ended before", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(new ProviderRequestUsage(1, InputTokens: 100, CacheReadTokens: 70), Assert.Single(usage));
     }
 
     [Fact]

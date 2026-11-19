@@ -7,6 +7,8 @@ using Crystal.Multimodal.Chat;
 using Crystal.Multimodal.Tools;
 using Crystal.Reasoning;
 using Crystal.Tools;
+
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Responses;
 
 using Xunit;
@@ -15,6 +17,42 @@ namespace CrystalCode.Providers.Tests.Responses;
 
 public sealed class ResponsesMultimodalProviderTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Stream_ThrowsJsonErrorBodyAndReportsItsUsage(bool buffered)
+    {
+        var handler = new RecordingHandler(JsonResponse.Create(
+            """{"error":{"code":"server_error","message":"failed"},"usage":{"output_tokens":3}}"""));
+        using var http = new HttpClient(handler);
+        var usage = new List<ProviderRequestUsage>();
+        using var provider = new ResponsesMultimodalProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/"),
+                requestShape: new ResponsesRequestShape(CompleteOverStream: buffered))
+            {
+                RequestContext = () => new("main", null, usage.Add)
+            },
+            http);
+        var request = new MultimodalChatRequest(
+            [new MultimodalMessage(MultimodalChatRole.User, [new TextContent("Hi")])]);
+
+        var error = await Assert.ThrowsAsync<ResponsesException>(async () =>
+        {
+            if (buffered)
+            {
+                await provider.CompleteAsync(request);
+                return;
+            }
+
+            await foreach (var _ in provider.StreamAsync(request))
+            {
+            }
+        });
+
+        Assert.Equal("server_error", error.ErrorCode);
+        Assert.Equal(new ProviderRequestUsage(1, OutputTokens: 3), Assert.Single(usage));
+    }
+
     [Fact]
     public async Task CompleteAsync_WritesInlineAndUriImages()
     {

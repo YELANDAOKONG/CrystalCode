@@ -337,7 +337,9 @@ An auxiliary request uses its own scope within that conversation. Client
 factories can accept the context through the existing factory contract.
 Responses owns the wire mapping and parsing. With session affinity enabled,
 `session-id` uses the parent id for a child and the session id otherwise,
-`thread-id` identifies the current conversation, and
+`thread-id` identifies the current conversation. Child threads derive their
+wire identity from both the parent and child ids, so forked children keep
+their saved ids but use distinct routes, including for auxiliary calls.
 `x-client-request-id` is fresh on each attempt, including the automatic
 authentication retry. With the cache key enabled, `prompt_cache_key` uses
 the same affinity value as `session-id`. Existing explicit HTTP headers
@@ -2550,6 +2552,10 @@ HTTP attempts, how many calls returned a usage report, and the sums of
 reported input, output, reasoning, cache-read, and cache-write tokens. A
 missing field remains unknown when no call supplied it. The existing
 context accounting and session token totals use the Crystal usage contract.
+The ChatGPT handler counts inference sends after it obtains a token, so a
+failed token lookup or refresh before the first send contributes zero. A
+JSON error body returned in place of an event stream still contributes
+the usage fields it supplies.
 
 Operator plugins live under `plugins/`. A project directory of the same
 name replaces the home plugin as a whole. `plugin.json` field `enabled`

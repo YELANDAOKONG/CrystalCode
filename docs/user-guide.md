@@ -991,7 +991,8 @@ complete calls consume the stream internally and return a complete result.
 By default, requests carry session routing headers. A resumed conversation
 keeps its identity. Each child Agent has its own thread and shares its
 parent's session affinity. Clearing or forking a session starts with a new
-identity. You can opt a model into sending a matching `prompt_cache_key`.
+identity. Resuming an inherited child on a fork uses that fork's route.
+You can opt a model into sending a matching `prompt_cache_key`.
 
 ```json
 {
@@ -1936,7 +1937,9 @@ It is not provider-billed usage. The choice is written to `config.json`.
 shows HTTP attempts, calls that returned usage, and reported input, cache
 read, cache write, output, and reasoning tokens, grouped by provider, model,
 and main, child, or auxiliary work. Review and compaction are auxiliary
-work. Missing counts display as `--`. The ChatGPT plan's five-hour and
+work. For ChatGPT sign-in, HTTP attempts count inference sends. A token
+failure before the first send contributes zero. Missing counts display as
+`--`. The ChatGPT plan's five-hour and
 weekly limits are tracked by ChatGPT separately.
 
 `/statusline` does not replace `/status`. The status line is a configurable

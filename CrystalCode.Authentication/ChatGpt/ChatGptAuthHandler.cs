@@ -40,6 +40,7 @@ internal sealed class ChatGptAuthHandler : DelegatingHandler
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
+        request.Options.Set(ProviderHttpRequestOptions.InferenceAttempts, 0);
         // Buffered so a second attempt can send the same body.
         if (request.Content is not null)
         {
@@ -48,6 +49,8 @@ internal sealed class ChatGptAuthHandler : DelegatingHandler
 
         var token = await GetAccessTokenAsync(rejected: null, cancellationToken).ConfigureAwait(false);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        cancellationToken.ThrowIfCancellationRequested();
+        request.Options.Set(ProviderHttpRequestOptions.InferenceAttempts, 1);
         var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.Unauthorized)
         {
@@ -63,6 +66,8 @@ internal sealed class ChatGptAuthHandler : DelegatingHandler
             prepareRetry(retry);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
+        request.Options.Set(ProviderHttpRequestOptions.InferenceAttempts, 2);
         return await base.SendAsync(retry, cancellationToken).ConfigureAwait(false);
     }
 

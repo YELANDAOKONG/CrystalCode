@@ -52,12 +52,9 @@ internal sealed class ProtocolChatClient : IStreamingChatClient, IDisposable
             using var streamedResponse = await SendAsync(tracking, streamedBody, stream: true, cancellationToken)
                 .ConfigureAwait(false);
             return await ProtocolStream.ReadCompletionAsync(streamedResponse.Content, _options.VendorName,
-                root =>
-                {
-                    tracking.Observe(root);
-                    return readCompletion(root);
-                }, (message, code, inner) => _codec.CreateException(
-                    message, errorCode: code, innerException: inner), cancellationToken).ConfigureAwait(false);
+                readCompletion, (message, code, inner) => _codec.CreateException(
+                    message, errorCode: code, innerException: inner), tracking.Observe, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         var body = _codec.WriteRequest(tracking.Options, request, stream: false);
@@ -100,6 +97,7 @@ internal sealed class ProtocolChatClient : IStreamingChatClient, IDisposable
                 message,
                 innerException: inner,
                 errorCode: code),
+            tracking.Observe,
             cancellationToken).ConfigureAwait(false))
         {
             IReadOnlyList<ChatStreamEvent> events;
@@ -164,10 +162,10 @@ internal sealed class ProtocolChatClient : IStreamingChatClient, IDisposable
 
         RequestHeaders.Apply(request, _httpHeaders);
 
+        cancellationToken.ThrowIfCancellationRequested();
         HttpResponseMessage? response = null;
         try
         {
-            tracking.OnSend(request);
             response = await _httpClient.SendAsync(
                 request,
                 stream ? HttpCompletionOption.ResponseHeadersRead : HttpCompletionOption.ResponseContentRead,
@@ -218,6 +216,10 @@ internal sealed class ProtocolChatClient : IStreamingChatClient, IDisposable
                     $"{_options.VendorName} request failed.",
                     exception),
                 innerException: exception);
+        }
+        finally
+        {
+            tracking.RecordAttempts(request);
         }
     }
 }

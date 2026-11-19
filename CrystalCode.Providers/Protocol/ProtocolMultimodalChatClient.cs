@@ -55,12 +55,9 @@ internal sealed class ProtocolMultimodalChatClient
             using var streamedResponse = await SendAsync(tracking, streamedBody, stream: true, cancellationToken)
                 .ConfigureAwait(false);
             return await ProtocolStream.ReadCompletionAsync(streamedResponse.Content, _options.VendorName,
-                root =>
-                {
-                    tracking.Observe(root);
-                    return readCompletion(root);
-                }, (message, code, inner) => _codec.CreateException(
-                    message, errorCode: code, innerException: inner), cancellationToken).ConfigureAwait(false);
+                readCompletion, (message, code, inner) => _codec.CreateException(
+                    message, errorCode: code, innerException: inner), tracking.Observe, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         var body = _codec.WriteRequest(tracking.Options, request, stream: false);
@@ -103,6 +100,7 @@ internal sealed class ProtocolMultimodalChatClient
                 message,
                 innerException: inner,
                 errorCode: code),
+            tracking.Observe,
             cancellationToken).ConfigureAwait(false))
         {
             IReadOnlyList<MultimodalChatStreamEvent> events;
@@ -167,10 +165,10 @@ internal sealed class ProtocolMultimodalChatClient
 
         RequestHeaders.Apply(request, _httpHeaders);
 
+        cancellationToken.ThrowIfCancellationRequested();
         HttpResponseMessage? response = null;
         try
         {
-            tracking.OnSend(request);
             response = await _httpClient.SendAsync(
                 request,
                 stream
@@ -223,6 +221,10 @@ internal sealed class ProtocolMultimodalChatClient
                     $"{_options.VendorName} request failed.",
                     exception),
                 innerException: exception);
+        }
+        finally
+        {
+            tracking.RecordAttempts(request);
         }
     }
 }

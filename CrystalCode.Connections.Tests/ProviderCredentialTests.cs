@@ -66,7 +66,7 @@ public sealed class ProviderCredentialTests
         Assert.Equal("marked", capture.Header);
         Assert.Null(capture.Authorization);
         Assert.Equal(officialEndpoint ? "parent" : null, capture.Affinity);
-        Assert.Equal(officialEndpoint ? "child" : null, capture.Thread);
+        Assert.Equal(officialEndpoint, capture.Thread is not null);
         Assert.Equal(officialEndpoint, Guid.TryParseExact(capture.ClientRequestId, "N", out _));
         Assert.Equal(new ProviderRequestUsage(1, 1200, 5, 2, 1024, 100), Assert.Single(observed));
 
@@ -89,6 +89,75 @@ public sealed class ProviderCredentialTests
         {
             Assert.Single(input);
             Assert.Equal("workspace rules", root.GetProperty("instructions").GetString());
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ResponsesFactory_RoutesAnInheritedChildWithinItsOwnBranch(bool auxiliary)
+    {
+        var capture = new CaptureInner();
+        var credential = new ProviderCredential(string.Empty, new MarkingHandler { InnerHandler = capture });
+        var settings = AccountSettings(
+            responses: new ResponsesRequestSettings(PromptCacheKey: true),
+            baseUri: new Uri("https://api.openai.com/v1/"),
+            integration: "chatgpt");
+        var parent = "original";
+        var request = new ChatRequest([new ChatMessage(ChatRole.User, "go")]);
+        var client = new ResponsesClientFactory().Create(settings, credential,
+            () => new ProviderRequestContext("inherited-child", parent, _ => { }, IsAuxiliary: auxiliary));
+        using var disposable = (IDisposable)client;
+
+        async Task<(string Thread, string Affinity)> SendAsync()
+        {
+            await client.CompleteAsync(request);
+            var thread = Assert.IsType<string>(capture.Thread);
+            var affinity = Assert.IsType<string>(capture.Affinity);
+            using var body = JsonDocument.Parse(Assert.IsType<string>(capture.Body));
+            Assert.Equal(affinity, body.RootElement.GetProperty("prompt_cache_key").GetString());
+            Assert.Equal(auxiliary ? thread : parent, affinity);
+            return (thread, affinity);
+        }
+
+        var original = await SendAsync();
+        parent = "fork";
+        var fork = await SendAsync();
+        Assert.NotEqual(original.Thread, fork.Thread);
+        Assert.NotEqual(original.Affinity, fork.Affinity);
+        Assert.Equal(fork, await SendAsync());
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task ResponsesFactory_RecordsOnlyInferenceAttemptsOnAuthenticationFailure(int attempts)
+    {
+        var capture = new CaptureInner();
+        var handler = new MarkingHandler
+        {
+            InnerHandler = capture,
+            FailAfterInferenceAttempts = attempts
+        };
+        var credential = new ProviderCredential(string.Empty, handler);
+        var settings = AccountSettings(
+            baseUri: new Uri("https://api.openai.com/v1/"),
+            integration: "chatgpt");
+        var observed = new List<ProviderRequestUsage>();
+        var client = new ResponsesClientFactory().Create(settings, credential,
+            () => new ProviderRequestContext("parent", null, observed.Add));
+        using var disposable = (IDisposable)client;
+
+        var error = await Assert.ThrowsAsync<ResponsesException>(() =>
+            client.CompleteAsync(new ChatRequest([new ChatMessage(ChatRole.User, "go")])));
+        Assert.IsType<AuthenticationFailedException>(error.InnerException);
+        if (attempts == 0)
+        {
+            Assert.Empty(observed);
+        }
+        else
+        {
+            Assert.Equal(new ProviderRequestUsage(attempts), Assert.Single(observed));
         }
     }
 
@@ -264,10 +333,19 @@ public sealed class ProviderCredentialTests
 
     private sealed class MarkingHandler : DelegatingHandler
     {
+        public int? FailAfterInferenceAttempts { get; init; }
+
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            if (FailAfterInferenceAttempts is { } attempts)
+            {
+                request.Options.Set(ProviderHttpRequestOptions.InferenceAttempts, attempts);
+                return Task.FromException<HttpResponseMessage>(
+                    new AuthenticationFailedException("The test token could not be renewed."));
+            }
+
             request.Headers.TryAddWithoutValidation("X-Marked", "marked");
             return base.SendAsync(request, cancellationToken);
         }
