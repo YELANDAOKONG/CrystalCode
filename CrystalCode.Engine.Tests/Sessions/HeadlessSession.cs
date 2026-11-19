@@ -11,6 +11,7 @@ using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Engine.Tests.Tools.Questions;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Plugins.Clients;
 
 namespace CrystalCode.Engine.Tests.Sessions;
 
@@ -37,7 +38,8 @@ internal sealed class HeadlessSession : IDisposable
         IReadOnlyList<DirectoryAccess>? additionalRoots = null,
         Func<IReadOnlyList<string>, string, CancellationToken, Task<string?>>? chooseTheme = null,
         Func<string, bool, CrystalCode.Engine.Authentication.Interfaces.ILoginInteraction>? createLogin = null,
-        Action<PluginRegistry>? configurePlugins = null)
+        Action<PluginRegistry>? configurePlugins = null,
+        Action<ProviderRequestContext>? observeRequest = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         Observer = new RecordingSessionObserver();
@@ -51,7 +53,7 @@ internal sealed class HeadlessSession : IDisposable
 
         var plugins = new PluginRegistry();
         plugins.Add(new WorkspaceToolsPlugin());
-        ChatPlugin = new ScriptedChatPlugin(client, images);
+        ChatPlugin = new ScriptedChatPlugin(client, images, observeRequest);
         plugins.Add(ChatPlugin);
         configurePlugins?.Invoke(plugins);
 

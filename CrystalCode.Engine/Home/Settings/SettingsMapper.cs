@@ -295,7 +295,9 @@ internal static class SettingsMapper
                             shape.SystemAsInstructions,
                             shape.IncludeEncryptedReasoning,
                             shape.OmitSampling,
-                            shape.SystemAsDeveloper)
+                            shape.SystemAsDeveloper,
+                            shape.SessionAffinity,
+                            shape.PromptCacheKey)
                         : null);
             }
         }
@@ -373,7 +375,9 @@ internal static class SettingsMapper
                         SystemAsInstructions = responses.SystemAsInstructions,
                         IncludeEncryptedReasoning = responses.IncludeEncryptedReasoning,
                         OmitSampling = responses.OmitSampling,
-                        SystemAsDeveloper = responses.SystemAsDeveloper
+                        SystemAsDeveloper = responses.SystemAsDeveloper,
+                        SessionAffinity = responses.SessionAffinity,
+                        PromptCacheKey = responses.PromptCacheKey
                     }
                     : null,
                 ServiceTiers = settings.ServiceTiers.Count == 0

@@ -325,6 +325,24 @@ The switch is independent of sampling and reasoning options.
 Official account-backed Responses calls use SSE for complete and streaming
 operations. A complete call consumes the terminal response internally and
 returns one result to callers such as approval review and compaction.
+Connections enables `responses.sessionAffinity` by default and
+`responses.promptCacheKey` on explicit opt-in for the official endpoint
+with the `chatgpt` integration. These switches apply independently.
+
+The engine captures provider-neutral request context when the adapter starts
+a request. It supplies the current session id, the parent id for child
+requests, and a sink for per-request usage. A resumed conversation keeps
+its id. Clearing or forking the conversation takes the newly allocated id.
+An auxiliary request uses its own scope within that conversation. Client
+factories can accept the context through the existing factory contract.
+Responses owns the wire mapping and parsing. With session affinity enabled,
+`session-id` uses the parent id for a child and the session id otherwise,
+`thread-id` identifies the current conversation, and
+`x-client-request-id` is fresh on each attempt, including the automatic
+authentication retry. With the cache key enabled, `prompt_cache_key` uses
+the same affinity value as `session-id`. Existing explicit HTTP headers
+take precedence over generated headers. API-key and custom endpoints
+retain their existing request shape and transport defaults.
 
 ### CrystalCode.Authentication
 
@@ -522,8 +540,9 @@ system block and the last message content block of every request, so the
 tool definitions, the system prompt, and the conversation prefix written by
 the previous round are read from the provider's prompt cache; the multimodal
 codec keeps the message breakpoint when image expansion splits a marked text
-block. Other adapters rely on their providers' automatic prefix caching and
-send no cache directives. Chat Completions, Responses, Anthropic Messages,
+block. Official ChatGPT account Responses can send affinity and a prompt
+cache key as described above. The remaining adapters rely on their
+providers' automatic prefix caching. Chat Completions, Responses, Anthropic Messages,
 Gemini, and Ollama map an `error` payload, an event whose `type` is `error`,
 and a JSON body returned where an event stream or JSON lines were expected to
 provider faults carrying the provider code and message. Gemini uses
@@ -2522,6 +2541,15 @@ persistent chrome remains the smallest live summary.
 `/status` labels cumulative values as session usage and reserves the latest
 request breakdown for `/status full`; its output does not depend on status-line
 customization.
+
+When the Responses adapter reports request diagnostics, `/status full`
+groups them by main, child, or auxiliary work and by provider and model.
+The collection starts fresh with each turn or session change, and an
+in-flight request reports to the collection it started with. Rows show
+HTTP attempts, how many calls returned a usage report, and the sums of
+reported input, output, reasoning, cache-read, and cache-write tokens. A
+missing field remains unknown when no call supplied it. The existing
+context accounting and session token totals use the Crystal usage contract.
 
 Operator plugins live under `plugins/`. A project directory of the same
 name replaces the home plugin as a whole. `plugin.json` field `enabled`

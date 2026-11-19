@@ -17,8 +17,12 @@ namespace CrystalCode.Engine.Configuration;
 /// <param name="SystemAsDeveloper">
 /// Send system messages as developer messages in input, overriding <c>SystemAsInstructions</c>.
 /// </param>
+/// <param name="SessionAffinity">Send conversation routing headers on the official ChatGPT endpoint.</param>
+/// <param name="PromptCacheKey">Send a conversation-derived cache key on the official ChatGPT endpoint.</param>
 public sealed record ResponsesRequestSettings(
     bool? SystemAsInstructions = null,
     bool? IncludeEncryptedReasoning = null,
     bool? OmitSampling = null,
-    bool? SystemAsDeveloper = null);
+    bool? SystemAsDeveloper = null,
+    bool? SessionAffinity = null,
+    bool? PromptCacheKey = null);

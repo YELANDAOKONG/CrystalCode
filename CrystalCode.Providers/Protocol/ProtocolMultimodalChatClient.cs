@@ -48,24 +48,30 @@ internal sealed class ProtocolMultimodalChatClient
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        using var tracking = new ProtocolRequestTracking(_options, _codec.ReadRequestUsage);
         if (_codec.StreamCompletionReader is { } readCompletion)
         {
-            var streamedBody = _codec.WriteRequest(_options, request, stream: true);
-            using var streamedResponse = await SendAsync(streamedBody, stream: true, cancellationToken)
+            var streamedBody = _codec.WriteRequest(tracking.Options, request, stream: true);
+            using var streamedResponse = await SendAsync(tracking, streamedBody, stream: true, cancellationToken)
                 .ConfigureAwait(false);
             return await ProtocolStream.ReadCompletionAsync(streamedResponse.Content, _options.VendorName,
-                readCompletion, (message, code, inner) => _codec.CreateException(
+                root =>
+                {
+                    tracking.Observe(root);
+                    return readCompletion(root);
+                }, (message, code, inner) => _codec.CreateException(
                     message, errorCode: code, innerException: inner), cancellationToken).ConfigureAwait(false);
         }
 
-        var body = _codec.WriteRequest(_options, request, stream: false);
-        using var response = await SendAsync(body, stream: false, cancellationToken)
+        var body = _codec.WriteRequest(tracking.Options, request, stream: false);
+        using var response = await SendAsync(tracking, body, stream: false, cancellationToken)
             .ConfigureAwait(false);
         var payload = await response.Content.ReadAsStringAsync(cancellationToken)
             .ConfigureAwait(false);
         try
         {
             using var document = JsonDocument.Parse(payload);
+            tracking.Observe(document.RootElement);
             return _codec.ReadResponse(document.RootElement);
         }
         catch (JsonException exception)
@@ -81,8 +87,9 @@ internal sealed class ProtocolMultimodalChatClient
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var body = _codec.WriteRequest(_options, request, stream: true);
-        using var response = await SendAsync(body, stream: true, cancellationToken)
+        using var tracking = new ProtocolRequestTracking(_options, _codec.ReadRequestUsage);
+        var body = _codec.WriteRequest(tracking.Options, request, stream: true);
+        using var response = await SendAsync(tracking, body, stream: true, cancellationToken)
             .ConfigureAwait(false);
         await using var content = await response.Content.ReadAsStreamAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -102,6 +109,7 @@ internal sealed class ProtocolMultimodalChatClient
             try
             {
                 using var document = JsonDocument.Parse(data);
+                tracking.Observe(document.RootElement);
                 events = parser.Parse(document.RootElement);
             }
             catch (JsonException exception)
@@ -133,6 +141,7 @@ internal sealed class ProtocolMultimodalChatClient
     }
 
     private async Task<HttpResponseMessage> SendAsync(
+        ProtocolRequestTracking tracking,
         byte[] body,
         bool stream,
         CancellationToken cancellationToken)
@@ -154,12 +163,14 @@ internal sealed class ProtocolMultimodalChatClient
                     ? "application/x-ndjson"
                     : stream ? "text/event-stream" : "application/json"));
         _codec.AddHeaders(request, _options.ApiKey);
+        _codec.AddRequestHeaders(request, tracking.Options);
 
         RequestHeaders.Apply(request, _httpHeaders);
 
         HttpResponseMessage? response = null;
         try
         {
+            tracking.OnSend(request);
             response = await _httpClient.SendAsync(
                 request,
                 stream
@@ -173,7 +184,7 @@ internal sealed class ProtocolMultimodalChatClient
 
             var bodyText = await response.Content.ReadAsStringAsync(cancellationToken)
                 .ConfigureAwait(false);
-            var (code, providerMessage) = CompatibleWire.ReadError(bodyText);
+            var (code, providerMessage) = CompatibleWire.ReadError(bodyText, tracking.Observe);
             var status = (int)response.StatusCode;
             var message = code is null
                 ? $"{_options.VendorName} request failed (HTTP {status})."

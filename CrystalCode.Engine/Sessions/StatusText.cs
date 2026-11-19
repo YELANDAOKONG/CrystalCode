@@ -139,6 +139,22 @@ public static class StatusText
                     ("Output tokens", TokenValue(status.Usage?.OutputTokenCount)),
                     ("Total tokens", TokenValue(status.Usage?.TotalTokenCount))
                 ]);
+            foreach (var usage in status.RequestUsage ?? [])
+            {
+                AddSection(
+                    lines,
+                    $"{usage.Scope} requests ({usage.Provider} / {usage.Model})",
+                    [
+                        ("HTTP attempts", Number(usage.HttpAttempts)),
+                        ("Usage reports", Number(usage.UsageReports)),
+                        ("Input", TokenValue(usage.InputTokens)),
+                        ("Cache reads", TokenValue(usage.CacheReadTokens)),
+                        ("Cache writes", TokenValue(usage.CacheWriteTokens)),
+                        ("Output", TokenValue(usage.OutputTokens)),
+                        ("Reasoning", TokenValue(usage.ReasoningTokens))
+                    ]);
+            }
+
             AddSection(
                 lines,
                 "Activity",

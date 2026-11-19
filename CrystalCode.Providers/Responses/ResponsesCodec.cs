@@ -6,6 +6,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Protocol;
 using CrystalCode.Providers.Protocol.Interfaces;
 
@@ -42,6 +43,9 @@ internal sealed class ResponsesCodec : IProtocolCodec
         }
     }
 
+    public void AddRequestHeaders(HttpRequestMessage request, ProtocolOptions options) =>
+        ResponsesRequestRouting.AddHeaders(request, _shape, options.ActiveRequest);
+
     public byte[] WriteRequest(ProtocolOptions options, ChatRequest request, bool stream)
     {
         JsonOutputGuard.Reject(request.JsonOutput, _vendorName);
@@ -55,6 +59,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
         {
             writer.WriteStartObject();
             writer.WriteString("model", options.Model);
+            ResponsesRequestRouting.WriteCacheKey(writer, _shape, options.ActiveRequest);
             if (_shape.UseTopLevelInstructions)
             {
                 var instructions = string.Join(
@@ -697,6 +702,45 @@ internal sealed class ResponsesCodec : IProtocolCodec
 
         return new TokenUsage(input, output, reasoning);
     }
+
+    public ProviderRequestUsage? ReadRequestUsage(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        if (root.TryGetProperty("response", out var response) && response.ValueKind == JsonValueKind.Object)
+        {
+            root = response;
+        }
+
+        if (!root.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        usage.TryGetProperty("input_tokens_details", out var details);
+        if (details.ValueKind != JsonValueKind.Object)
+        {
+            usage.TryGetProperty("prompt_tokens_details", out details);
+        }
+
+        var hasReasoning = TryReadNestedCount(usage, "output_tokens_details", out var reasoning)
+            || TryReadNestedCount(usage, "completion_tokens_details", out reasoning);
+        return new ProviderRequestUsage(
+            HttpAttempts: 0,
+            InputTokens: TryReadCount(usage, "input_tokens", "prompt_tokens", out var input) && input >= 0 ? input : null,
+            OutputTokens: TryReadCount(usage, "output_tokens", "completion_tokens", out var output) && output >= 0 ? output : null,
+            ReasoningTokens: hasReasoning && reasoning >= 0 ? reasoning : null,
+            CacheReadTokens: ReadCacheCount(details, "cached_tokens"),
+            CacheWriteTokens: ReadCacheCount(details, "cache_write_tokens"));
+    }
+
+    private static long? ReadCacheCount(JsonElement details, string name) =>
+        details.ValueKind == JsonValueKind.Object && TryReadInt64(details, name, out var count) && count >= 0
+            ? count
+            : null;
 
     private Exception ReadStreamFailure(JsonElement root)
     {

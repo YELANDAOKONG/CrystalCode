@@ -988,6 +988,10 @@ size below only show the shape.
 
 ChatGPT account requests use SSE on the wire. Approval review and other
 complete calls consume the stream internally and return a complete result.
+By default, requests carry session routing headers. A resumed conversation
+keeps its identity. Each child Agent has its own thread and shares its
+parent's session affinity. Clearing or forking a session starts with a new
+identity. You can opt a model into sending a matching `prompt_cache_key`.
 
 ```json
 {
@@ -1033,6 +1037,12 @@ With the legacy format, `systemAsInstructions` selects top-level
 and `false` for API-key providers. `includeEncryptedReasoning` defaults
 to `true` and asks for encrypted reasoning so it can be replayed. Another
 protocol rejects a `responses` object.
+
+For the official ChatGPT account endpoint, set `responses.sessionAffinity`
+to `false` to disable the generated routing headers. Set
+`responses.promptCacheKey` to `true` to send the cache key. The defaults
+are `true` and `false` respectively. The switches are independent, and
+their settings apply only to this account integration on the official endpoint.
 
 A personal and a work account use separate provider names, each with its own
 login. Then run `crystal login chatgpt-personal`.
@@ -1921,6 +1931,13 @@ prints the current workspace root. `/cd` only accepts a directory
 that already exists. `/tokens` with no argument toggles the live
 progress-row estimate (four characters per token, prefixed with `~`).
 It is not provider-billed usage. The choice is written to `config.json`.
+
+`/status full` includes Responses request diagnostics when available. It
+shows HTTP attempts, calls that returned usage, and reported input, cache
+read, cache write, output, and reasoning tokens, grouped by provider, model,
+and main, child, or auxiliary work. Review and compaction are auxiliary
+work. Missing counts display as `--`. The ChatGPT plan's five-hour and
+weekly limits are tracked by ChatGPT separately.
 
 `/statusline` does not replace `/status`. The status line is a configurable
 live summary, while `/status` remains a stable diagnostic report. Supported

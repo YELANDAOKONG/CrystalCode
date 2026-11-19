@@ -12,6 +12,7 @@ using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.External;
 using CrystalCode.Engine.Tools.Questions.Interfaces;
 using CrystalCode.Engine.Tools.Todos;
+using CrystalCode.Plugins.Clients;
 
 namespace CrystalCode.Engine.Plugins;
 
@@ -280,7 +281,13 @@ public sealed class PluginRegistry
     public IStreamingChatClient CreateClient(HarnessSettings settings, string apiKey) =>
         CreateClient(settings, new ProviderCredential(apiKey));
 
-    public IStreamingChatClient CreateClient(HarnessSettings settings, ProviderCredential credential)
+    public IStreamingChatClient CreateClient(HarnessSettings settings, ProviderCredential credential) =>
+        CreateClient(settings, credential, null);
+
+    internal IStreamingChatClient CreateClient(
+        HarnessSettings settings,
+        ProviderCredential credential,
+        Func<ProviderRequestContext>? requestContext)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(credential);
@@ -293,7 +300,9 @@ public sealed class PluginRegistry
         {
             if (factory.CanCreate(protocol))
             {
-                return factory.Create(settings, credential);
+                return requestContext is null
+                    ? factory.Create(settings, credential)
+                    : factory.Create(settings, credential, requestContext);
             }
         }
 
@@ -308,7 +317,13 @@ public sealed class PluginRegistry
 
     public IStreamingMultimodalChatClient? CreateMultimodalClient(
         HarnessSettings settings,
-        ProviderCredential credential)
+        ProviderCredential credential) =>
+        CreateMultimodalClient(settings, credential, null);
+
+    internal IStreamingMultimodalChatClient? CreateMultimodalClient(
+        HarnessSettings settings,
+        ProviderCredential credential,
+        Func<ProviderRequestContext>? requestContext)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(credential);
@@ -326,7 +341,9 @@ public sealed class PluginRegistry
         {
             if (factory.CanCreate(protocol))
             {
-                return factory.CreateMultimodal(settings, credential);
+                return requestContext is null
+                    ? factory.CreateMultimodal(settings, credential)
+                    : factory.CreateMultimodal(settings, credential, requestContext);
             }
         }
 

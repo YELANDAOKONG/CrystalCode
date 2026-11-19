@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 
 using CrystalCode.Engine.Authentication;
+using CrystalCode.Plugins.Clients;
 
 using Xunit;
 
@@ -68,12 +69,23 @@ public sealed class ChatGptHandlerTests
         await fixture.SignInAsync();
         var inference = new InferenceServer { RejectToken = "access-1" };
         using var client = Client(fixture, inference);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/responses")
+        {
+            Content = Body("payload")
+        };
+        request.Headers.Add("x-client-request-id", "first-attempt");
+        request.Options.Set(ProviderHttpRequestOptions.AdditionalAttempt, retry =>
+        {
+            retry.Headers.Remove("x-client-request-id");
+            retry.Headers.Add("x-client-request-id", "second-attempt");
+        });
 
-        using var response = await client.PostAsync("https://api.openai.com/v1/responses", Body("payload"));
+        using var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(["Bearer access-1", "Bearer access-2"], inference.Authorizations);
         Assert.Equal(["payload", "payload"], inference.Bodies);
+        Assert.Equal(["first-attempt", "second-attempt"], inference.RequestIds);
         Assert.Equal(1, fixture.Server.RefreshCount);
     }
 
@@ -155,6 +167,8 @@ public sealed class ChatGptHandlerTests
 
         public List<string> Bodies { get; } = [];
 
+        public List<string> RequestIds { get; } = [];
+
         public string? RejectToken { get; set; }
 
         public bool RejectEverything { get; set; }
@@ -167,6 +181,10 @@ public sealed class ChatGptHandlerTests
             lock (Authorizations)
             {
                 Authorizations.Add(authorization);
+                if (request.Headers.TryGetValues("x-client-request-id", out var values))
+                {
+                    RequestIds.Add(values.Single());
+                }
             }
 
             lock (Bodies)

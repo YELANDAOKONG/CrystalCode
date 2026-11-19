@@ -9,4 +9,8 @@ internal sealed class ResponsesRequestDocument
     public bool? OmitSampling { get; set; }
 
     public bool? SystemAsDeveloper { get; set; }
+
+    public bool? SessionAffinity { get; set; }
+
+    public bool? PromptCacheKey { get; set; }
 }

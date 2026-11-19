@@ -60,4 +60,7 @@ public sealed record SessionStatus(
     string? ExtendedApprovalThinking = null,
     string? ExtendedApprovalTrigger = null,
     bool? ExtendedApprovalPrimaryReview = null,
-    SessionPendingSettings? Pending = null);
+    SessionPendingSettings? Pending = null)
+{
+    public IReadOnlyList<ProviderUsageSummary>? RequestUsage { get; init; }
+}

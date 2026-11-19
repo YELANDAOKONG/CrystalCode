@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using Crystal.Chat;
+using CrystalCode.Plugins.Clients;
 
 namespace CrystalCode.Providers.Protocol.Interfaces;
 internal interface IProtocolCodec
@@ -16,6 +17,10 @@ internal interface IProtocolCodec
     IReadOnlyList<string> ReservedHeaders => [];
 
     void AddHeaders(HttpRequestMessage request, string apiKey);
+
+    void AddRequestHeaders(HttpRequestMessage request, ProtocolOptions options) { }
+
+    ProviderRequestUsage? ReadRequestUsage(JsonElement root) => null;
 
     ChatResponse ReadResponse(JsonElement root);
 

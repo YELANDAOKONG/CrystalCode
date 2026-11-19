@@ -1,3 +1,5 @@
+using CrystalCode.Plugins.Clients;
+
 namespace CrystalCode.Providers.Protocol;
 
 internal sealed record ProtocolOptions(
@@ -10,4 +12,9 @@ internal sealed record ProtocolOptions(
     TimeSpan RequestTimeout,
     string VendorName,
     string? ServiceTier = null,
-    string? Speed = null);
+    string? Speed = null)
+{
+    public Func<ProviderRequestContext>? RequestContext { get; init; }
+
+    public ProviderRequestContext? ActiveRequest { get; init; }
+}

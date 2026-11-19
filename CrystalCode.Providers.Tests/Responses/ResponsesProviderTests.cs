@@ -5,6 +5,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Responses;
 
 using Xunit;
@@ -13,6 +14,42 @@ namespace CrystalCode.Providers.Tests.Responses;
 
 public sealed class ResponsesProviderTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task FailedRequest_ReportsTransportAttemptAndOnlyTheUsageActuallyReturned(bool stream)
+    {
+        const string failure = """
+            {"status":"failed","error":{"code":"server_error","message":"The response failed."},"usage":{"input_tokens":100,"input_tokens_details":{"cached_tokens":0}}}
+            """;
+        var handler = new RecordingHandler(stream
+            ? JsonResponse.CreateStream("""data: {"type":"response.failed","response":""" + failure + "}\n\n")
+            : JsonResponse.Create(failure, System.Net.HttpStatusCode.InternalServerError));
+        using var http = new HttpClient(handler);
+        var observed = new List<ProviderRequestUsage>();
+        using var provider = new ResponsesProvider(
+            new ResponsesOptions("test-key", "gpt-test", new Uri("https://example.test/v1/"))
+            {
+                RequestContext = () => new("main", null, observed.Add)
+            }, http);
+        var request = new ChatRequest([new ChatMessage(ChatRole.User, "Hi")]);
+
+        await Assert.ThrowsAsync<ResponsesException>(async () =>
+        {
+            if (!stream)
+            {
+                await provider.CompleteAsync(request);
+                return;
+            }
+
+            await foreach (var _ in provider.StreamAsync(request))
+            {
+            }
+        });
+
+        Assert.Equal(new ProviderRequestUsage(1, InputTokens: 100, CacheReadTokens: 0), Assert.Single(observed));
+    }
+
     [Fact]
     public async Task CompleteAsync_WritesResponsesContractAndReadsTools()
     {

@@ -101,14 +101,15 @@ internal static class CompatibleWire
         return new TokenUsage(promptTokens, completionTokens, reasoningTokens);
     }
 
-    public static (string? Code, string? Message) ReadError(string body)
+    public static (string? Code, string? Message) ReadError(string body, Action<JsonElement>? observe = null)
     {
-        return TryReadError(body, out var code, out var message)
+        return TryReadError(body, out var code, out var message, observe)
             ? (code, message)
             : (null, null);
     }
 
-    public static bool TryReadError(string body, out string? code, out string? message)
+    public static bool TryReadError(
+        string body, out string? code, out string? message, Action<JsonElement>? observe = null)
     {
         code = null;
         message = null;
@@ -120,6 +121,7 @@ internal static class CompatibleWire
         try
         {
             using var document = JsonDocument.Parse(body);
+            observe?.Invoke(document.RootElement);
             return TryReadError(document.RootElement, out code, out message);
         }
         catch (JsonException)

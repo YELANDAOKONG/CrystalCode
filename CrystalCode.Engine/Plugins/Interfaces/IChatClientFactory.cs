@@ -2,6 +2,7 @@ using Crystal.Chat;
 using Crystal.Multimodal.Chat;
 using CrystalCode.Engine.Authentication;
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Plugins.Clients;
 
 namespace CrystalCode.Engine.Plugins.Interfaces;
 
@@ -38,6 +39,19 @@ public interface IChatClientFactory
         RejectHandler(credential);
         return CreateMultimodal(settings, credential.ApiKey);
     }
+
+    /// <summary>The accessor captures the active conversation when a request is sent.</summary>
+    IStreamingChatClient Create(
+        HarnessSettings settings,
+        ProviderCredential credential,
+        Func<ProviderRequestContext> requestContext) =>
+        Create(settings, credential);
+
+    IStreamingMultimodalChatClient? CreateMultimodal(
+        HarnessSettings settings,
+        ProviderCredential credential,
+        Func<ProviderRequestContext> requestContext) =>
+        CreateMultimodal(settings, credential);
 
     private static void RejectHandler(ProviderCredential credential)
     {

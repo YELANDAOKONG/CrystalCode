@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 using Crystal;
@@ -14,6 +15,7 @@ using CrystalCode.Engine.Prompts;
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
 using CrystalCode.Engine.Tools.Todos;
+using CrystalCode.Plugins.Clients;
 
 using Xunit;
 
@@ -233,14 +235,17 @@ public sealed class ChildSessionTests
         var promptClock = new DateTimeOffset(2025, 2, 3, 4, 5, 6, TimeSpan.FromHours(8));
         original.Children[0] = originalChild with { PromptClock = promptClock };
         var arguments = JsonSerializer.Serialize(new { agent = "explore", label = "continue", prompt = "Second question", sessionId = childId });
+        var contexts = new ConcurrentQueue<ProviderRequestContext>();
         using var resumed = new HeadlessSession(new ScriptedStreamingClient(Tool("task", arguments),
                 Tool("read", """{"path":"missing.txt"}"""), Text("second answer"), Text("parent")),
-            resume: original, settings: Settings());
+            resume: original, settings: Settings(), observeRequest: contexts.Enqueue);
         await resumed.Session.StartAsync(CancellationToken.None);
         await resumed.RunTurnAsync("continue delegation");
         var saved = resumed.ReadSaved();
         var child = Assert.Single(saved.Children);
         Assert.Equal(childId, child.Id);
+        Assert.Equal(2, contexts.Count(context => context.SessionId == childId && context.ParentSessionId == original.Id));
+        Assert.Equal(2, contexts.Count(context => context.SessionId == original.Id && context.ParentSessionId is null));
         Assert.Equal(promptClock, child.PromptClock);
         var system = Assert.Single(child.Items, item => item.Role == "system");
         Assert.Contains("Today's date: Monday Feb 3, 2025", system.Text, StringComparison.Ordinal);
@@ -361,15 +366,29 @@ public sealed class ChildSessionTests
     }
 
     [Fact]
-    public async Task Clear_DropsChildrenAndUsage()
+    public async Task ClearAndFork_StartNewRequestIdentityAndUsage()
     {
+        var contexts = new ConcurrentQueue<ProviderRequestContext>();
         using var session = new HeadlessSession(new ScriptedStreamingClient(
-            Tool("task", """{"agent":"explore","label":"read","prompt":"inspect"}"""), Text("child"), Text("parent")), settings: Settings());
+            Tool("task", """{"agent":"explore","label":"read","prompt":"inspect"}"""), Text("child"), Text("parent"),
+            Text("next session"), Text("forked session")), settings: Settings(), observeRequest: contexts.Enqueue);
         await session.Session.StartAsync(CancellationToken.None);
         await session.RunTurnAsync("delegate");
+        var originalId = session.ReadSaved().Id;
         await session.Session.SubmitAsync("/clear", CancellationToken.None);
         Assert.Empty(session.ReadSaved().Children);
         Assert.Null(session.ReadSaved().CumulativeUsage);
+        await session.Session.SubmitAsync("/status full", CancellationToken.None);
+        Assert.Empty(session.Observer.Events.OfType<StatusReported>().Last().Status.RequestUsage!);
+        await session.RunTurnAsync("start again");
+        var clearedId = session.ReadSaved().Id;
+        Assert.NotEqual(originalId, clearedId);
+        Assert.Equal(clearedId, contexts.Last().SessionId);
+        await session.Session.SubmitAsync("/fork", CancellationToken.None);
+        await session.RunTurnAsync("continue the fork");
+        var forkedId = session.ReadSaved().Id;
+        Assert.NotEqual(clearedId, forkedId);
+        Assert.Equal(forkedId, contexts.Last().SessionId);
     }
 
     [Fact]
@@ -512,7 +531,12 @@ public sealed class ChildSessionTests
                 Interlocked.Decrement(ref active);
             }
         });
-        using var session = new HeadlessSession(client, settings: Settings(concurrency));
+        var requestContexts = new ConcurrentQueue<ProviderRequestContext>();
+        using var session = new HeadlessSession(client, settings: Settings(concurrency), observeRequest: context =>
+        {
+            requestContexts.Enqueue(context);
+            context.ReportUsage(new ProviderRequestUsage(1, 100, 2, 1, 40));
+        });
         await session.Session.StartAsync(CancellationToken.None);
         await session.Session.SubmitAsync("delegate three independent tasks", CancellationToken.None);
         await ready.Task.WaitAsync(TimeSpan.FromSeconds(10));
@@ -525,16 +549,29 @@ public sealed class ChildSessionTests
         Assert.Equal(3, saved.Children.Select(child => child.Id).Distinct().Count());
         Assert.Equal(concurrency, maximum);
         Assert.Equal(60, saved.CumulativeUsage!.InputTokenCount);
+        Assert.Equal(2, requestContexts.Count(context => context.SessionId == saved.Id && context.ParentSessionId is null));
         foreach (var child in saved.Children)
         {
             Assert.Equal("completed", child.Status);
             Assert.Contains(child.Archive, item => item.Text == "answer:" + child.Label);
             Assert.Single(child.Archive, item => item.Role == "assistant");
             Assert.DoesNotContain(child.Tools, name => name == "task");
+            Assert.Single(requestContexts, context => context.SessionId == child.Id && context.ParentSessionId == saved.Id);
         }
         var calls = session.Observer.Events.OfType<ToolCallsIssued>().Single().Calls;
         var results = session.Observer.Events.OfType<ToolResultsReceived>().Single().Results;
         Assert.Equal(calls.Select(call => call.CallId), results.Select(result => result.CallId));
+
+        await session.Session.SubmitAsync("/status full", CancellationToken.None);
+        var status = session.Observer.Events.OfType<StatusReported>().Last().Status;
+        var childUsage = Assert.Single(status.RequestUsage!, usage => usage.Scope == "Child");
+        Assert.Equal(3, childUsage.HttpAttempts);
+        Assert.Equal(120, childUsage.CacheReadTokens);
+        Assert.Null(childUsage.CacheWriteTokens);
+        var mainUsage = Assert.Single(status.RequestUsage!, usage => usage.Scope == "Main");
+        Assert.Equal(2, mainUsage.HttpAttempts);
+        Assert.Equal(200, mainUsage.InputTokens);
+        Assert.Equal(60, status.CumulativeUsage!.InputTokenCount);
     }
 
     [Fact]
@@ -771,11 +808,17 @@ public sealed class ChildSessionTests
             Tool("task", """{"agent":"work","label":"build","prompt":"run the build"}"""),
             Tool("bash", """{"command":"echo build"}"""), Text("child"), Text("parent"));
         var picked = 0;
+        var contexts = new ConcurrentQueue<ProviderRequestContext>();
         using var session = new HeadlessSession(model, settings: Settings().WithApproval(Engine.Approvals.ApprovalMode.Review),
             chooseChild: (_, _) =>
             {
                 Interlocked.Increment(ref picked);
                 return Task.FromResult<string?>(null);
+            },
+            observeRequest: context =>
+            {
+                contexts.Enqueue(context);
+                context.ReportUsage(new ProviderRequestUsage(1, 100));
             });
         await session.Session.StartAsync(CancellationToken.None);
         await session.Session.SubmitAsync("delegate", CancellationToken.None);
@@ -788,6 +831,9 @@ public sealed class ChildSessionTests
             Assert.Equal("running", child.Status);
             Assert.Equal(1, child.ModelCalls);
             Assert.Equal(1, child.ToolCalls);
+            var review = Assert.Single(contexts, context => context.IsAuxiliary);
+            Assert.Equal(child.Id, review.SessionId);
+            Assert.Equal(session.Session.SessionId, review.ParentSessionId);
         }
         finally
         {
@@ -795,6 +841,10 @@ public sealed class ChildSessionTests
             await session.Session.TurnTask!.WaitAsync(TimeSpan.FromSeconds(10));
             await session.Session.FinishTurnAsync();
         }
+
+        await session.Session.SubmitAsync("/status full", CancellationToken.None);
+        var usage = session.Observer.Events.OfType<StatusReported>().Last().Status.RequestUsage!;
+        Assert.Equal(1, Assert.Single(usage, row => row.Scope == "Auxiliary").HttpAttempts);
     }
 
     [Fact]

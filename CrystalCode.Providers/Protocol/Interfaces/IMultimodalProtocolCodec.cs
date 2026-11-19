@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using Crystal.Multimodal.Chat;
+using CrystalCode.Plugins.Clients;
 
 namespace CrystalCode.Providers.Protocol.Interfaces;
 internal interface IMultimodalProtocolCodec
@@ -21,6 +22,10 @@ internal interface IMultimodalProtocolCodec
     IReadOnlyList<string> ReservedHeaders => [];
 
     void AddHeaders(HttpRequestMessage request, string apiKey);
+
+    void AddRequestHeaders(HttpRequestMessage request, ProtocolOptions options) { }
+
+    ProviderRequestUsage? ReadRequestUsage(JsonElement root) => null;
 
     MultimodalChatResponse ReadResponse(JsonElement root);
 

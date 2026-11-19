@@ -4,6 +4,7 @@ using CrystalCode.Engine.Authentication;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Interfaces;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Responses;
 
 namespace CrystalCode.Connections.Responses;
@@ -37,9 +38,17 @@ public sealed class ResponsesClientFactory : IChatClientFactory
         string apiKey) =>
         CreateMultimodal(settings, new ProviderCredential(apiKey));
 
-    public IStreamingChatClient Create(HarnessSettings settings, ProviderCredential credential)
+    public IStreamingChatClient Create(HarnessSettings settings, ProviderCredential credential) =>
+        OpenText(settings, credential, null);
+
+    public IStreamingChatClient Create(
+        HarnessSettings settings, ProviderCredential credential, Func<ProviderRequestContext> requestContext) =>
+        OpenText(settings, credential, requestContext);
+
+    private static IStreamingChatClient OpenText(
+        HarnessSettings settings, ProviderCredential credential, Func<ProviderRequestContext>? requestContext)
     {
-        var options = CreateOptions(settings, credential);
+        var options = CreateOptions(settings, credential) with { RequestContext = requestContext };
         return new ResponsesProvider(
             options,
             credential.Handler is null ? null : credential.CreateHttpClient(options.RequestTimeout),
@@ -48,9 +57,17 @@ public sealed class ResponsesClientFactory : IChatClientFactory
 
     public IStreamingMultimodalChatClient CreateMultimodal(
         HarnessSettings settings,
-        ProviderCredential credential)
+        ProviderCredential credential) =>
+        OpenMultimodal(settings, credential, null);
+
+    public IStreamingMultimodalChatClient CreateMultimodal(
+        HarnessSettings settings, ProviderCredential credential, Func<ProviderRequestContext> requestContext) =>
+        OpenMultimodal(settings, credential, requestContext);
+
+    private static IStreamingMultimodalChatClient OpenMultimodal(
+        HarnessSettings settings, ProviderCredential credential, Func<ProviderRequestContext>? requestContext)
     {
-        var options = CreateOptions(settings, credential);
+        var options = CreateOptions(settings, credential) with { RequestContext = requestContext };
         return new ResponsesMultimodalProvider(
             options,
             credential.Handler is null ? null : credential.CreateHttpClient(options.RequestTimeout),
@@ -73,6 +90,7 @@ public sealed class ResponsesClientFactory : IChatClientFactory
         var accountEndpoint = credential.Handler is not null;
         var officialEndpoint = provider.BaseUri.AbsoluteUri is
             "https://api.openai.com/v1/" or "https://api.openai.com/v1";
+        var chatGpt = officialEndpoint && accountEndpoint && provider.Integration == "chatgpt";
         // Honor an existing explicit choice of system-message format.
         var systemAsDeveloper = shape?.SystemAsDeveloper
             ?? (shape?.SystemAsInstructions is null && officialEndpoint);
@@ -92,6 +110,8 @@ public sealed class ResponsesClientFactory : IChatClientFactory
                 shape?.IncludeEncryptedReasoning ?? true,
                 shape?.OmitSampling ?? accountEndpoint,
                 SystemAsDeveloper: systemAsDeveloper,
-                CompleteOverStream: accountEndpoint && officialEndpoint));
+                CompleteOverStream: accountEndpoint && officialEndpoint,
+                SessionAffinity: chatGpt && shape?.SessionAffinity != false,
+                PromptCacheKey: chatGpt && shape?.PromptCacheKey == true));
     }
 }

@@ -47,6 +47,7 @@ using CrystalCode.Engine.Tools.Images;
 using CrystalCode.Engine.Tools.Questions.Interfaces;
 using CrystalCode.Engine.Tools.Shell;
 using CrystalCode.Engine.Tools.Todos;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Plugins.Commands;
 using CrystalCode.Plugins.Hooks;
 using CrystalCode.Plugins.Models;
@@ -66,6 +67,8 @@ public sealed class CodingSession : ITurnObserver
     private readonly SemaphoreSlim _approvalQueue = new(1, 1);
     private readonly SemaphoreSlim _operatorGate = new(1, 1);
     private readonly AsyncLocal<string?> _childOrigin = new();
+    private readonly AsyncLocal<string?> _childRequestId = new();
+    private readonly AsyncLocal<bool> _insideApprovalPolicy = new();
     private readonly AsyncLocal<string?> _requestOrigin = new();
     private readonly AsyncLocal<Action<SessionEvent>?> _childPublish = new();
     private readonly AsyncLocal<Func<IReadOnlyList<ChatItem>>?> _childConversation = new();
@@ -403,6 +406,7 @@ public sealed class CodingSession : ITurnObserver
             await _childSlots.WaitAsync(cancellationToken);
             entered = true;
             _childOrigin.Value = $"{agent} / {child.Label} / {child.Id}";
+            _childRequestId.Value = child.Id;
             _childPublish.Value = Emit;
             child = child with { Status = "running", PromptClock = child.PromptClock ?? DateTimeOffset.Now };
             _children.Set(child);
@@ -514,7 +518,7 @@ public sealed class CodingSession : ITurnObserver
                             .WithThinkingEffort(_settings.CompactionModel.ThinkingEffort)
                         : selectedModel;
                 }
-                var summaryClient = CreateClient(summarySelection.WithOutputTokenCap(compactionLimits.SummaryOutputCap()));
+                var summaryClient = CreateClient(summarySelection.WithOutputTokenCap(compactionLimits.SummaryOutputCap()), auxiliary: true);
                 try
                 {
                     var budgeted = new ChildSummaryClient(summaryClient, _sharedBudget, () =>
@@ -1202,6 +1206,7 @@ public sealed class CodingSession : ITurnObserver
     private IDisposable? _turnNotice;
     private TurnStopReason? _lastStop;
     private readonly object _usageGate = new();
+    private ProviderUsageLedger _providerUsage;
     private readonly SessionReviewContext _reviewContext = new();
     private readonly SessionLedger _ledger = new();
     private ChildSessionStore _children = new();
@@ -1383,6 +1388,7 @@ public sealed class CodingSession : ITurnObserver
         _prompts = _promptResolution.Prompts;
         ReloadSkills();
         _sessionId = sessionLock.Id;
+        _providerUsage = new ProviderUsageLedger(_sessionId);
         _sessionLock = sessionLock;
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
@@ -4179,7 +4185,7 @@ public sealed class CodingSession : ITurnObserver
 
         try
         {
-            client = CreateClient(approvalSettings);
+            client = CreateClient(approvalSettings, auxiliary: true);
             return true;
         }
         catch (Exception exception) when (exception is ArgumentException
@@ -6112,7 +6118,10 @@ public sealed class CodingSession : ITurnObserver
                     ? _settings.ExtendedApproval.IncludePrimaryReview
                     : null,
                 Mode: _customMode,
-                Pending: CurrentPending()),
+                Pending: CurrentPending())
+            {
+                RequestUsage = full ? Volatile.Read(ref _providerUsage).Snapshot() : null
+            },
             full));
     }
 
@@ -6379,10 +6388,10 @@ public sealed class CodingSession : ITurnObserver
     /// A new client on the session model. Plugin calls stay off the instance
     /// that is streaming the current turn.
     /// </summary>
-    private IStreamingChatClient CreateSideSessionClient() => CreateClient(_settings);
+    private IStreamingChatClient CreateSideSessionClient() => CreateClient(_settings, auxiliary: true);
 
     private IStreamingMultimodalChatClient? CreateSideImageClient() =>
-        CreateMultimodalClient(_settings);
+        CreateMultimodalClient(_settings, auxiliary: true);
 
     private ImageDescriber? CreateImageDescriber()
     {
@@ -6423,7 +6432,7 @@ public sealed class CodingSession : ITurnObserver
             return _imageDescriptionClient;
         }
 
-        var client = CreateMultimodalClient(_settings.ForResource(_settings.ResourceModels.Image))
+        var client = CreateMultimodalClient(_settings.ForResource(_settings.ResourceModels.Image), auxiliary: true)
             ?? throw new InvalidOperationException(
                 "The image model does not accept image input.");
         _imageDescriptionClient = client;
@@ -6438,7 +6447,7 @@ public sealed class CodingSession : ITurnObserver
             throw new InvalidOperationException("Review is using the session model.");
         }
 
-        return CreateClient(_settings.ForReviewer(approval));
+        return CreateClient(_settings.ForReviewer(approval), auxiliary: true);
     }
 
     /// <summary>
@@ -6448,7 +6457,21 @@ public sealed class CodingSession : ITurnObserver
     private IAuthenticationIntegration? FindIntegration(string id) =>
         _plugins.FindIntegration(id) ?? _loadedPlugins.FindIntegration(id);
 
-    private IStreamingChatClient CreateClient(HarnessSettings settings)
+    private ProviderRequestContext CaptureProviderRequest(HarnessSettings settings, bool auxiliary)
+    {
+        auxiliary |= _insideApprovalPolicy.Value;
+        var ledger = Volatile.Read(ref _providerUsage);
+        var parent = ledger.SessionId;
+        var child = _childRequestId.Value;
+        var scope = auxiliary ? "Auxiliary" : child is null ? "Main" : "Child";
+        return new ProviderRequestContext(
+            child ?? parent,
+            child is null ? null : parent,
+            usage => ledger.Record(scope, settings.Provider.Value, settings.Model, usage),
+            IsAuxiliary: auxiliary);
+    }
+
+    private IStreamingChatClient CreateClient(HarnessSettings settings, bool auxiliary = false)
     {
         if (!_credentials.TryOpen(settings.ActiveProvider, FindIntegration, out var credential, out var error))
         {
@@ -6463,7 +6486,7 @@ public sealed class CodingSession : ITurnObserver
 
         try
         {
-            return ChatClientFactory.Create(settings, credential, _plugins);
+            return _plugins.CreateClient(settings, credential, () => CaptureProviderRequest(settings, auxiliary));
         }
         catch (NotSupportedException) when (
             _loadedPlugins.TryCreateClient(settings, credential, out var client) && client is not null)
@@ -6473,7 +6496,8 @@ public sealed class CodingSession : ITurnObserver
     }
 
     private IStreamingMultimodalChatClient? CreateMultimodalClient(
-        HarnessSettings settings)
+        HarnessSettings settings,
+        bool auxiliary = false)
     {
         if (!_credentials.TryOpen(settings.ActiveProvider, FindIntegration, out var credential, out var error))
         {
@@ -6490,7 +6514,7 @@ public sealed class CodingSession : ITurnObserver
         if (!_loadedPlugins.OverridesProtocol(settings)
             && _plugins.Clients.Any(factory => factory.CanCreate(protocol)))
         {
-            client = MultimodalChatClientFactory.Create(settings, credential, _plugins);
+            client = _plugins.CreateMultimodalClient(settings, credential, () => CaptureProviderRequest(settings, auxiliary));
         }
         else
         {
@@ -7356,6 +7380,7 @@ public sealed class CodingSession : ITurnObserver
         ResetTopic(null, byOperator: false);
         Publish(new ImageHistoryInvalidated());
         _sessionId = ClaimFreshSession();
+        Volatile.Write(ref _providerUsage, new ProviderUsageLedger(_sessionId));
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         lock (_archiveGate)
@@ -7774,6 +7799,7 @@ public sealed class CodingSession : ITurnObserver
         _settings = _settings.WithSessionDisabledBuiltInTools(
             SessionMapper.ReadDisabledBuiltInTools(document.DisabledBuiltInTools));
         _sessionId = document.Id!;
+        Volatile.Write(ref _providerUsage, new ProviderUsageLedger(_sessionId));
         _sessionCreatedUtc = document.CreatedUtc ?? DateTimeOffset.UtcNow;
         ResetTopic(
             SessionTopic.Normalize(document.Topic),
@@ -7954,6 +7980,8 @@ public sealed class CodingSession : ITurnObserver
                 {
                     _reviewContext.Conversation = conversation();
                 }
+                // The default reviewer reuses the session client.
+                _insideApprovalPolicy.Value = true;
                 return await policy.DecideAsync(call, token);
             }
             finally
@@ -9543,7 +9571,7 @@ public sealed class CodingSession : ITurnObserver
             // A separate client, like a side question: the next turn may start
             // on the session client while naming still runs. It keeps the
             // model's own output cap, because reasoning tokens count against it.
-            client = CreateClient(selected);
+            client = CreateClient(selected, auxiliary: true);
             owned = !ReferenceEquals(client, _client);
             var assembler = new ChatStreamAssembler();
             await foreach (var streamEvent in client.StreamAsync(request, cancellationToken))
@@ -10047,11 +10075,11 @@ public sealed class CodingSession : ITurnObserver
         // follows the model this client will serve. The key is stored only
         // after that choice is committed.
         var host = _settings.WithCompactionModel(settings);
-        return CreateClient(selected.WithOutputTokenCap(LimitsFor(host).SummaryOutputCap()));
+        return CreateClient(selected.WithOutputTokenCap(LimitsFor(host).SummaryOutputCap()), auxiliary: true);
     }
 
     private IStreamingChatClient CreateSummaryClient(HarnessSettings selected) =>
-        CreateClient(selected.WithOutputTokenCap(LimitsFor(selected).SummaryOutputCap()));
+        CreateClient(selected.WithOutputTokenCap(LimitsFor(selected).SummaryOutputCap()), auxiliary: true);
 
     private void ReplaceCompactionClient(CompactionModelSettings settings, IStreamingChatClient? client)
     {
@@ -11363,6 +11391,7 @@ public sealed class CodingSession : ITurnObserver
         var turnSource = new CancellationTokenSource();
         _turnSource = turnSource;
         _turnActive = true;
+        Volatile.Write(ref _providerUsage, new ProviderUsageLedger(_sessionId));
         lock (_usageGate)
         {
             _turnCumulativeBaseline = _shownCumulative;
@@ -11953,7 +11982,7 @@ public sealed class CodingSession : ITurnObserver
         ChatResponse response;
         try
         {
-            client = CreateClient(selected);
+            client = CreateClient(selected, auxiliary: true);
             owned = !ReferenceEquals(client, _client);
             var checkClient = client;
             response = await SessionRetry.RunAsync(
@@ -12043,7 +12072,7 @@ public sealed class CodingSession : ITurnObserver
         IStreamingChatClient? summaryClient = null;
         try
         {
-            summaryClient = CreateClient(summarySelection.WithOutputTokenCap(limits.SummaryOutputCap()));
+            summaryClient = CreateClient(summarySelection.WithOutputTokenCap(limits.SummaryOutputCap()), auxiliary: true);
             var budgeted = new ChildSummaryClient(summaryClient, _sharedBudget, () => { });
             var compactor = new ContextCompactor(
                 budgeted,
@@ -12992,7 +13021,7 @@ public sealed class CodingSession : ITurnObserver
         var ownedSummary = false;
         try
         {
-            client = CreateClient(_settings);
+            client = CreateClient(_settings, auxiliary: true);
             owned = !ReferenceEquals(client, _client);
             var compactor = CreateCompactor(
                 () =>

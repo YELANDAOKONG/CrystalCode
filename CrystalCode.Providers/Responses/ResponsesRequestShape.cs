@@ -18,12 +18,16 @@ namespace CrystalCode.Providers.Responses;
 /// <param name="CompleteOverStream">
 /// Use SSE for complete calls and return the terminal response as one result.
 /// </param>
+/// <param name="SessionAffinity">Send session and thread routing headers.</param>
+/// <param name="PromptCacheKey">Send a stable key derived from the session identity.</param>
 public sealed record ResponsesRequestShape(
     bool SystemAsInstructions = false,
     bool IncludeEncryptedReasoning = true,
     bool OmitSampling = false,
     bool SystemAsDeveloper = false,
-    bool CompleteOverStream = false)
+    bool CompleteOverStream = false,
+    bool SessionAffinity = false,
+    bool PromptCacheKey = false)
 {
     internal bool UseTopLevelInstructions => SystemAsInstructions && !SystemAsDeveloper;
 

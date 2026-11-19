@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using CrystalCode.Engine.Authentication;
 using CrystalCode.Engine.Authentication.Interfaces;
 using CrystalCode.Engine.Configuration;
+using CrystalCode.Plugins.Clients;
 
 namespace CrystalCode.Authentication.ChatGpt;
 
@@ -57,6 +58,11 @@ internal sealed class ChatGptAuthHandler : DelegatingHandler
         var renewed = await GetAccessTokenAsync(rejected: token, cancellationToken).ConfigureAwait(false);
         using var retry = await CloneAsync(request, cancellationToken).ConfigureAwait(false);
         retry.Headers.Authorization = new AuthenticationHeaderValue("Bearer", renewed);
+        if (request.Options.TryGetValue(ProviderHttpRequestOptions.AdditionalAttempt, out var prepareRetry))
+        {
+            prepareRetry(retry);
+        }
+
         return await base.SendAsync(retry, cancellationToken).ConfigureAwait(false);
     }
 

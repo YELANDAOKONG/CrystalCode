@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
 
@@ -77,6 +78,8 @@ public sealed record ResponsesOptions
     /// </summary>
     public ResponsesRequestShape RequestShape { get; }
 
+    public Func<ProviderRequestContext>? RequestContext { get; init; }
+
     public string ApiKey { get; }
     public string Model { get; }
     public Uri BaseUri { get; }
@@ -107,5 +110,8 @@ public sealed record ResponsesOptions
             RequestTimeout,
             VendorName,
             ServiceTier,
-            Speed);
+            Speed)
+        {
+            RequestContext = RequestContext
+        };
 }

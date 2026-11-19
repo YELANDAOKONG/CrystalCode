@@ -10,6 +10,7 @@ using Crystal.Multimodal.Chat;
 using Crystal.Multimodal.Tools;
 using Crystal.Reasoning;
 using Crystal.Tools;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Protocol;
 using CrystalCode.Providers.Protocol.Interfaces;
 
@@ -55,6 +56,12 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         }
     }
 
+    public void AddRequestHeaders(HttpRequestMessage request, ProtocolOptions options) =>
+        _textCodec.AddRequestHeaders(request, options);
+
+    public ProviderRequestUsage? ReadRequestUsage(JsonElement root) =>
+        _textCodec.ReadRequestUsage(root);
+
     public byte[] WriteRequest(
         ProtocolOptions options,
         MultimodalChatRequest request,
@@ -73,6 +80,7 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         {
             writer.WriteStartObject();
             writer.WriteString("model", options.Model);
+            ResponsesRequestRouting.WriteCacheKey(writer, _shape, options.ActiveRequest);
             if (_shape.UseTopLevelInstructions)
             {
                 var instructions = string.Join(

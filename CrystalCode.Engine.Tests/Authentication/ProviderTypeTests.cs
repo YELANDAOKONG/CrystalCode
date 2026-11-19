@@ -86,7 +86,10 @@ public sealed class ProviderTypeTests
                 "models": {
                   "model-a": {
                     "contextWindow": 64000,
-                    "responses": { "systemAsInstructions": true, "omitSampling": false, "systemAsDeveloper": true }
+                    "responses": {
+                      "systemAsInstructions": true, "omitSampling": false, "systemAsDeveloper": true,
+                      "sessionAffinity": false, "promptCacheKey": true
+                    }
                   }
                 }
               }
@@ -96,10 +99,13 @@ public sealed class ProviderTypeTests
         var catalog = store.Load().Catalog;
         var shape = catalog.Get(ProviderName.Parse("account"))[0].Models["model-a"].Responses;
 
-        Assert.Equal(new ResponsesRequestSettings(true, null, false, SystemAsDeveloper: true), shape);
+        Assert.Equal(new ResponsesRequestSettings(true, null, false,
+            SystemAsDeveloper: true, SessionAffinity: false, PromptCacheKey: true), shape);
         var written = System.Text.Json.JsonSerializer.Serialize(SettingsMapper.WriteProviders(catalog));
         Assert.Contains("\"responses\"", written, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("\"systemAsDeveloper\":true", written, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\"sessionAffinity\":false", written, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\"promptCacheKey\":true", written, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("includeEncryptedReasoning", written, StringComparison.OrdinalIgnoreCase);
     }
 

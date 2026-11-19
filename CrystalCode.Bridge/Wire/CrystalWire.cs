@@ -493,6 +493,26 @@ internal static class CrystalWire
         writer.WriteString("speed", status.Speed);
         Usage(writer, "usage", status.Usage);
         Usage(writer, "cumulativeUsage", status.CumulativeUsage);
+        if (status.RequestUsage is { Count: > 0 } requestUsage)
+        {
+            writer.WriteStartArray("requestUsage");
+            foreach (var usage in requestUsage)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("scope", usage.Scope);
+                writer.WriteString("provider", usage.Provider);
+                writer.WriteString("model", usage.Model);
+                writer.WriteNumber("httpAttempts", usage.HttpAttempts);
+                writer.WriteNumber("usageReports", usage.UsageReports);
+                WriteUsageCount(writer, "inputTokens", usage.InputTokens);
+                WriteUsageCount(writer, "outputTokens", usage.OutputTokens);
+                WriteUsageCount(writer, "reasoningTokens", usage.ReasoningTokens);
+                WriteUsageCount(writer, "cacheReadTokens", usage.CacheReadTokens);
+                WriteUsageCount(writer, "cacheWriteTokens", usage.CacheWriteTokens);
+                writer.WriteEndObject();
+            }
+            writer.WriteEndArray();
+        }
         writer.WriteNumber("userTurns", status.UserTurns);
         writer.WriteNumber("modelCalls", status.ModelCalls);
         writer.WriteNumber("toolCalls", status.ToolCalls);
@@ -846,6 +866,18 @@ internal static class CrystalWire
 
         writer.WriteEndArray();
         writer.WriteEndObject();
+    }
+
+    private static void WriteUsageCount(Utf8JsonWriter writer, string name, long? count)
+    {
+        if (count is long value)
+        {
+            writer.WriteNumber(name, value);
+        }
+        else
+        {
+            writer.WriteNull(name);
+        }
     }
 
     public static void Optional(Utf8JsonWriter writer, string name, string? value)
