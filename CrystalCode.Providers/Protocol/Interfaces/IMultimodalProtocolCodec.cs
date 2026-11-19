@@ -24,6 +24,8 @@ internal interface IMultimodalProtocolCodec
 
     MultimodalChatResponse ReadResponse(JsonElement root);
 
+    Func<JsonElement, MultimodalChatResponse?>? StreamCompletionReader => null;
+
     IMultimodalProtocolStreamParser CreateStreamParser();
 
     Exception CreateException(

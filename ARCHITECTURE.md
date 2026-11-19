@@ -322,6 +322,10 @@ as developer messages at their existing positions in `input` when enabled,
 making leading instructions eligible for prefix caching on supported models.
 The switch is independent of sampling and reasoning options.
 
+Official account-backed Responses calls use SSE for complete and streaming
+operations. A complete call consumes the terminal response internally and
+returns one result to callers such as approval review and compaction.
+
 ### CrystalCode.Authentication
 
 Authentication integrations. It ships no provider definitions: an operator
@@ -509,6 +513,9 @@ Opaque reasoning state is provider-owned: an adapter replays state only in
 its own format. A block it cannot replay keeps its readable text instead
 of failing (assistant text, or the protocol's readable reasoning field
 where it has one).
+Responses preserves the provider's assistant message phase next to its
+message using an opaque state item with no readable content. Its codecs
+restore `phase` on the corresponding message in the next request.
 Ollama uses JSON lines and native `tool_name` results. Anthropic Messages
 marks prompt-cache breakpoints (`cache_control: ephemeral`) on the last
 system block and the last message content block of every request, so the

@@ -38,21 +38,24 @@ public sealed class ProviderCredentialTests
         {
             var client = factory.CreateMultimodal(settings, credential);
             using var disposable = (IDisposable)client;
-            await client.CompleteAsync(new MultimodalChatRequest(
+            var response = await client.CompleteAsync(new MultimodalChatRequest(
             [
                 new MultimodalMessage(MultimodalChatRole.System, [new TextContent("workspace rules")]),
                 new MultimodalMessage(MultimodalChatRole.User, [new TextContent("go")])
             ]));
+            var message = Assert.IsType<MultimodalMessage>(Assert.Single(Assert.Single(response.Candidates).Items));
+            Assert.Equal("ok", Assert.IsType<TextContent>(Assert.Single(message.Contents)).Text);
         }
         else
         {
             var client = factory.Create(settings, credential);
             using var disposable = (IDisposable)client;
-            await client.CompleteAsync(new ChatRequest(
+            var response = await client.CompleteAsync(new ChatRequest(
             [
                 new ChatMessage(ChatRole.System, "workspace rules"),
                 new ChatMessage(ChatRole.User, "go")
             ]));
+            Assert.Equal("ok", Assert.IsType<ChatMessage>(Assert.Single(Assert.Single(response.Candidates).Items)).Text);
         }
 
         Assert.Equal("marked", capture.Header);
@@ -63,6 +66,7 @@ public sealed class ProviderCredentialTests
         var input = root.GetProperty("input").EnumerateArray().ToArray();
         Assert.Equal("user", input[^1].GetProperty("role").GetString());
         Assert.False(root.TryGetProperty("max_output_tokens", out _));
+        Assert.Equal(officialEndpoint, root.GetProperty("stream").GetBoolean());
         if (expectDeveloper)
         {
             Assert.False(root.TryGetProperty("instructions", out _));
@@ -227,12 +231,17 @@ public sealed class ProviderCredentialTests
             Authorization = request.Headers.Authorization?.ToString();
             HasVendorKeyHeader = request.Headers.Contains("x-api-key") || request.Headers.Contains("x-goog-api-key");
             Body = request.Content is { } content ? await content.ReadAsStringAsync(cancellationToken) : null;
+            const string response = """{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}]}""";
+            var stream = request.Headers.Accept.Any(value => value.MediaType == "text/event-stream");
             return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
             {
                 Content = new StringContent(
-                    """{"status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}]}""",
+                    stream
+                        ? "data: {\"type\":\"response.output_text.delta\",\"delta\":\"o\"}\n\n"
+                            + """data: {"type":"response.completed","response":""" + response + "}\n\n"
+                        : response,
                     System.Text.Encoding.UTF8,
-                    "application/json")
+                    stream ? "text/event-stream" : "application/json")
             };
         }
     }

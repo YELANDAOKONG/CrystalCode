@@ -13,6 +13,35 @@ namespace CrystalCode.Providers.Protocol;
 /// </summary>
 internal static class ProtocolStream
 {
+    public static async Task<T> ReadCompletionAsync<T>(
+        HttpContent content,
+        string vendorName,
+        Func<JsonElement, T?> readCompletion,
+        Func<string, string?, Exception?, Exception> create,
+        CancellationToken cancellationToken) where T : class
+    {
+        await using var stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        await foreach (var data in ReadDataAsync(reader, jsonLines: false, vendorName, create, cancellationToken)
+            .ConfigureAwait(false))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(data);
+                if (readCompletion(document.RootElement) is { } result)
+                {
+                    return result;
+                }
+            }
+            catch (JsonException exception)
+            {
+                throw create($"{vendorName} stream contained invalid JSON.", null, exception);
+            }
+        }
+
+        throw create($"{vendorName} stream ended before the candidate completed.", null, null);
+    }
+
     public static async IAsyncEnumerable<string> ReadDataAsync(
         StreamReader reader,
         bool jsonLines,

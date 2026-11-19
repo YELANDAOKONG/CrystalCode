@@ -1,6 +1,8 @@
 using System.Text.Json;
 
 using Crystal.Chat;
+using Crystal.Multimodal.Chat;
+using Crystal.Reasoning;
 using CrystalCode.Providers.Protocol;
 using CrystalCode.Providers.Responses;
 
@@ -59,5 +61,53 @@ public sealed class ResponsesInstructionsTests
         using var document = JsonDocument.Parse(body);
         Assert.False(document.RootElement.TryGetProperty("instructions", out _));
         Assert.Equal(3, document.RootElement.GetProperty("input").GetArrayLength());
+    }
+
+    [Fact]
+    public void StreamedAssistantPhase_IsReplayedOnItsMessageEvenAfterTheNextItemStarts()
+    {
+        var codec = new ResponsesCodec("x");
+        var parser = codec.CreateStreamParser();
+        using var delta = JsonDocument.Parse(
+            """{"type":"response.output_text.delta","output_index":0,"delta":"Checking."}""");
+        using var next = JsonDocument.Parse(
+            """{"type":"response.output_text.delta","output_index":1,"delta":"Done."}""");
+        using var done = JsonDocument.Parse(
+            """{"type":"response.output_item.done","output_index":0,"item":{"type":"message","role":"assistant","phase":"commentary","content":[{"type":"output_text","text":"Checking."}]}}""");
+
+        var first = Assert.IsType<ChatTextDelta>(Assert.Single(parser.Parse(delta.RootElement)));
+        var second = Assert.IsType<ChatTextDelta>(Assert.Single(parser.Parse(next.RootElement)));
+        var phase = Assert.IsType<ChatReasoningStateReceived>(Assert.Single(parser.Parse(done.RootElement)));
+        Assert.InRange(phase.ItemIndex, first.ItemIndex + 1, second.ItemIndex - 1);
+
+        var request = new ChatRequest(
+        [
+            new ChatMessage(first.Role, first.Text),
+            new ChatReasoningItem(new ReasoningContent([], phase.State)),
+            new ChatMessage(second.Role, second.Text)
+        ]);
+        using var body = JsonDocument.Parse(codec.WriteRequest(Options, request, stream: true));
+        var input = body.RootElement.GetProperty("input").EnumerateArray().ToArray();
+        Assert.Equal(2, input.Length);
+        Assert.Equal("commentary", input[0].GetProperty("phase").GetString());
+        Assert.False(input[1].TryGetProperty("phase", out _));
+    }
+
+    [Fact]
+    public void MultimodalAssistantPhase_RoundTripsThroughTheCompletedResponse()
+    {
+        var codec = new ResponsesMultimodalCodec("x", shape: new ResponsesRequestShape(CompleteOverStream: true));
+        using var completed = JsonDocument.Parse(
+            """
+            {"type":"response.completed","response":{"status":"completed","output":[
+              {"type":"message","role":"assistant","phase":"final_answer","content":[{"type":"output_text","text":"Done."}]}
+            ]}}
+            """);
+        var response = codec.StreamCompletionReader!(completed.RootElement)!;
+        var request = new MultimodalChatRequest(Assert.Single(response.Candidates).Items);
+        using var body = JsonDocument.Parse(codec.WriteRequest(Options, request, stream: true));
+        var message = Assert.Single(body.RootElement.GetProperty("input").EnumerateArray());
+        Assert.Equal("final_answer", message.GetProperty("phase").GetString());
+        Assert.Equal("Done.", message.GetProperty("content")[0].GetProperty("text").GetString());
     }
 }

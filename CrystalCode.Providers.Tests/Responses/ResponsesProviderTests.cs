@@ -71,8 +71,8 @@ public sealed class ResponsesProviderTests
         }
 
         Assert.Contains(events, item => item is ChatTextDelta { Text: "hello", ItemIndex: 0 });
-        Assert.Contains(events, item => item is ChatToolCallDelta { CallIdDelta: "call_1", NameDelta: "read", ItemIndex: 1 });
-        Assert.Contains(events, item => item is ChatToolCallDelta { ArgumentsDelta: "{}", ItemIndex: 1 });
+        Assert.Contains(events, item => item is ChatToolCallDelta { CallIdDelta: "call_1", NameDelta: "read", ItemIndex: 2 });
+        Assert.Contains(events, item => item is ChatToolCallDelta { ArgumentsDelta: "{}", ItemIndex: 2 });
         Assert.Contains(events, item => item is ChatUsageReceived);
         Assert.Contains(events, item => item is ChatCandidateCompleted { FinishReason: var reason } && reason == FinishReason.ToolCalls);
     }
@@ -417,7 +417,7 @@ public sealed class ResponsesProviderTests
 
         Assert.Equal(0, events.OfType<ChatReasoningTextDelta>().Single().ItemIndex);
         Assert.Equal(0, events.OfType<ChatReasoningStateReceived>().Single().ItemIndex);
-        Assert.Equal(1, events.OfType<ChatTextDelta>().Single().ItemIndex);
+        Assert.Equal(2, events.OfType<ChatTextDelta>().Single().ItemIndex);
     }
 
     [Fact]
@@ -447,7 +447,7 @@ public sealed class ResponsesProviderTests
 
         Assert.Equal(0, events.OfType<ChatReasoningTextDelta>().Single().ItemIndex);
         Assert.Equal(0, events.OfType<ChatReasoningStateReceived>().Single().ItemIndex);
-        Assert.Equal(1, events.OfType<ChatTextDelta>().Single().ItemIndex);
+        Assert.Equal(2, events.OfType<ChatTextDelta>().Single().ItemIndex);
     }
 
     [Fact]

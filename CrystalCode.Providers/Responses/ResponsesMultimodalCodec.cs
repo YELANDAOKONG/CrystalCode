@@ -93,8 +93,9 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
                 request.Items.OfType<MultimodalToolCall>().Select(static call =>
                     (call.CallId, call.Name, call.Arguments, call.InputKind)),
                 request.Tools);
-            foreach (var item in request.Items)
+            for (var index = 0; index < request.Items.Count; index++)
             {
+                var item = request.Items[index];
                 if (_shape.UseTopLevelInstructions
                     && item is MultimodalMessage { Role: var role }
                     && role == MultimodalChatRole.System)
@@ -102,7 +103,12 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
                     continue;
                 }
 
-                WriteItem(writer, item, folded);
+                var phase = item is MultimodalMessage { Role.Value: "assistant" }
+                    && index + 1 < request.Items.Count
+                    && request.Items[index + 1] is MultimodalReasoningItem metadata
+                    ? ResponsesMessagePhase.Get(metadata.Content.State)
+                    : null;
+                WriteItem(writer, item, folded, phase);
             }
 
             writer.WriteEndArray();
@@ -147,6 +153,12 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
     public MultimodalChatResponse ReadResponse(JsonElement root) =>
         Convert(_textCodec.ReadResponse(root));
 
+    public Func<JsonElement, MultimodalChatResponse?>? StreamCompletionReader =>
+        _shape.CompleteOverStream ? ReadCompletionEvent : null;
+
+    private MultimodalChatResponse? ReadCompletionEvent(JsonElement root) =>
+        _textCodec.ReadCompletionEvent(root) is { } response ? Convert(response) : null;
+
     public IMultimodalProtocolStreamParser CreateStreamParser() =>
         new StreamParser(_textCodec.CreateStreamParser());
 
@@ -163,12 +175,12 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
             errorCode,
             retryAfter);
 
-    private void WriteItem(Utf8JsonWriter writer, MultimodalChatItem item, IReadOnlySet<string> folded)
+    private void WriteItem(Utf8JsonWriter writer, MultimodalChatItem item, IReadOnlySet<string> folded, string? phase)
     {
         switch (item)
         {
             case MultimodalMessage message:
-                WriteMessage(writer, message);
+                WriteMessage(writer, message, phase);
                 break;
             case MultimodalReasoningItem reasoning:
                 WriteReasoningItem(writer, reasoning.Content);
@@ -195,7 +207,7 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         }
     }
 
-    private void WriteMessage(Utf8JsonWriter writer, MultimodalMessage message)
+    private void WriteMessage(Utf8JsonWriter writer, MultimodalMessage message, string? phase)
     {
         writer.WriteStartObject();
         writer.WriteString("type", "message");
@@ -208,6 +220,10 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
         }
 
         writer.WriteEndArray();
+        if (phase is not null)
+        {
+            writer.WriteString("phase", phase);
+        }
         writer.WriteEndObject();
     }
 

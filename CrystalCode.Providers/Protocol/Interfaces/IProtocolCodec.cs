@@ -19,6 +19,8 @@ internal interface IProtocolCodec
 
     ChatResponse ReadResponse(JsonElement root);
 
+    Func<JsonElement, ChatResponse?>? StreamCompletionReader => null;
+
     IProtocolStreamParser CreateStreamParser();
 
     Exception CreateException(

@@ -45,6 +45,16 @@ internal sealed class ProtocolChatClient : IStreamingChatClient, IDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (_codec.StreamCompletionReader is { } readCompletion)
+        {
+            var streamedBody = _codec.WriteRequest(_options, request, stream: true);
+            using var streamedResponse = await SendAsync(streamedBody, stream: true, cancellationToken)
+                .ConfigureAwait(false);
+            return await ProtocolStream.ReadCompletionAsync(streamedResponse.Content, _options.VendorName,
+                readCompletion, (message, code, inner) => _codec.CreateException(
+                    message, errorCode: code, innerException: inner), cancellationToken).ConfigureAwait(false);
+        }
+
         var body = _codec.WriteRequest(_options, request, stream: false);
         using var response = await SendAsync(body, stream: false, cancellationToken)
             .ConfigureAwait(false);

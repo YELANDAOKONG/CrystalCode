@@ -71,14 +71,20 @@ internal sealed class ResponsesCodec : IProtocolCodec
             writer.WritePropertyName("input");
             writer.WriteStartArray();
             var folded = FoldedCalls(request.Items.OfType<ToolCall>(), request.Tools);
-            foreach (var item in request.Items)
+            for (var index = 0; index < request.Items.Count; index++)
             {
+                var item = request.Items[index];
                 if (_shape.UseTopLevelInstructions && item is ChatMessage { Role: var role } && role == ChatRole.System)
                 {
                     continue;
                 }
 
-                WriteItem(writer, item, folded);
+                var phase = item is ChatMessage { Role.Value: "assistant" }
+                    && index + 1 < request.Items.Count
+                    && request.Items[index + 1] is ChatReasoningItem metadata
+                    ? ResponsesMessagePhase.Get(metadata.Content.State)
+                    : null;
+                WriteItem(writer, item, folded, phase);
             }
 
             writer.WriteEndArray();
@@ -162,10 +168,34 @@ internal sealed class ResponsesCodec : IProtocolCodec
 
     public IProtocolStreamParser CreateStreamParser() => new StreamParser(this);
 
+    public Func<JsonElement, ChatResponse?>? StreamCompletionReader =>
+        _shape.CompleteOverStream ? ReadCompletionEvent : null;
+
+    internal ChatResponse? ReadCompletionEvent(JsonElement root)
+    {
+        var type = ReadString(root, "type");
+        if (type is "response.failed" or "error")
+        {
+            throw ReadStreamFailure(root);
+        }
+
+        if (type is "response.completed" or "response.incomplete")
+        {
+            if (root.TryGetProperty("response", out var response) && response.ValueKind == JsonValueKind.Object)
+            {
+                return ReadResponse(response);
+            }
+
+            throw CreateException($"{_vendorName} stream completed without a response.");
+        }
+
+        return null;
+    }
+
     public Exception CreateException(string message, int? statusCode = null, Exception? innerException = null, string? errorCode = null, TimeSpan? retryAfter = null) =>
         new ResponsesException(message, statusCode, innerException, errorCode, retryAfter);
 
-    private void WriteItem(Utf8JsonWriter writer, ChatItem item, IReadOnlySet<string> folded)
+    private void WriteItem(Utf8JsonWriter writer, ChatItem item, IReadOnlySet<string> folded, string? phase)
     {
         switch (item)
         {
@@ -174,6 +204,10 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 writer.WriteString("type", "message");
                 writer.WriteString("role", _shape.MessageRole(message.Role.Value));
                 writer.WriteString("content", message.Text);
+                if (phase is not null)
+                {
+                    writer.WriteString("phase", phase);
+                }
                 writer.WriteEndObject();
                 break;
             case ChatReasoningItem reasoning:
@@ -425,7 +459,21 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 items.Add(new ChatReasoningItem(new ReasoningContent(texts, CreateState(item))));
                 break;
             case "message":
-                ReadMessage(item, items, ref refused);
+                if (ResponsesMessagePhase.Read(item) is { } phase)
+                {
+                    var messages = new List<ChatItem>();
+                    ReadMessage(item, messages, ref refused);
+                    if (messages.Count > 0)
+                    {
+                        items.Add(new ChatMessage(ChatRole.Assistant,
+                            string.Concat(messages.OfType<ChatMessage>().Select(static message => message.Text))));
+                        items.Add(new ChatReasoningItem(new ReasoningContent([], phase)));
+                    }
+                }
+                else
+                {
+                    ReadMessage(item, items, ref refused);
+                }
                 break;
             case "function_call":
                 if (!TryReadString(item, "call_id", out var callId)
@@ -772,6 +820,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
         private readonly HashSet<int> _argumentsAccepted = [];
         private readonly HashSet<int> _customIdentitySent = [];
         private readonly HashSet<int> _customInputAccepted = [];
+        private readonly HashSet<int> _phaseSent = [];
         private readonly Dictionary<int, string> _customNames = [];
         private readonly Dictionary<int, StringBuilder> _customInput = [];
         private int _nextItemIndex;
@@ -931,7 +980,35 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 return;
             }
 
-            if (type != "message" || _refusalTextEmitted || !item.TryGetProperty("content", out var content))
+            if (type != "message")
+            {
+                return;
+            }
+
+            var hasMessage = _itemIndexes.TryGetValue((outputIndex, StreamItemKind.Message), out var messageIndex);
+            if (ResponsesMessagePhase.Read(item) is { } phase && _phaseSent.Add(outputIndex))
+            {
+                if (!hasMessage)
+                {
+                    var messages = new List<ChatItem>();
+                    ReadMessage(item, messages, ref _refused);
+                    if (messages.Count > 0)
+                    {
+                        messageIndex = ItemIndex(outputIndex, StreamItemKind.Message);
+                        events.Add(new ChatTextDelta(0, messageIndex, ChatRole.Assistant,
+                            string.Concat(messages.OfType<ChatMessage>().Select(static message => message.Text))));
+                        hasMessage = true;
+                        _refusalTextEmitted |= _refused;
+                    }
+                }
+
+                if (hasMessage)
+                {
+                    events.Add(new ChatReasoningStateReceived(0, messageIndex + 1, phase));
+                }
+            }
+
+            if (_refusalTextEmitted || !item.TryGetProperty("content", out var content))
             {
                 return;
             }
@@ -1106,7 +1183,10 @@ internal sealed class ResponsesCodec : IProtocolCodec
                 return existing;
             }
 
-            var itemIndex = ReserveItemIndex(outputIndex);
+            // Reserve the next slot for a message's optional phase, even if
+            // later items have started by the time its done event arrives.
+            const int itemStride = 2;
+            var itemIndex = checked(ReserveItemIndex(outputIndex) * itemStride);
             _itemIndexes[(outputIndex, kind)] = itemIndex;
             return itemIndex;
         }

@@ -91,6 +91,7 @@ public sealed class ResponsesClientFactory : IChatClientFactory
                 shape?.SystemAsInstructions ?? accountEndpoint,
                 shape?.IncludeEncryptedReasoning ?? true,
                 shape?.OmitSampling ?? accountEndpoint,
-                SystemAsDeveloper: systemAsDeveloper));
+                SystemAsDeveloper: systemAsDeveloper,
+                CompleteOverStream: accountEndpoint && officialEndpoint));
     }
 }

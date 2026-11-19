@@ -986,6 +986,9 @@ message items. Crystal Code sends developer messages by default and omits
 `temperature`, `top_p`, and the output token cap. The model id and context
 size below only show the shape.
 
+ChatGPT account requests use SSE on the wire. Approval review and other
+complete calls consume the stream internally and return a complete result.
+
 ```json
 {
   "chatgpt-personal": {

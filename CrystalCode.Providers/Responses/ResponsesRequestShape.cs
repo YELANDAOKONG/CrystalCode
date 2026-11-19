@@ -15,11 +15,15 @@ namespace CrystalCode.Providers.Responses;
 /// <param name="SystemAsDeveloper">
 /// Write system messages as developer messages in input, overriding <c>SystemAsInstructions</c>.
 /// </param>
+/// <param name="CompleteOverStream">
+/// Use SSE for complete calls and return the terminal response as one result.
+/// </param>
 public sealed record ResponsesRequestShape(
     bool SystemAsInstructions = false,
     bool IncludeEncryptedReasoning = true,
     bool OmitSampling = false,
-    bool SystemAsDeveloper = false)
+    bool SystemAsDeveloper = false,
+    bool CompleteOverStream = false)
 {
     internal bool UseTopLevelInstructions => SystemAsInstructions && !SystemAsDeveloper;
 
