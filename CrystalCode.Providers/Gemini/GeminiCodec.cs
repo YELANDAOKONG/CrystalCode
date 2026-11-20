@@ -6,6 +6,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Protocol;
 using CrystalCode.Providers.Protocol.Interfaces;
 
@@ -427,6 +428,29 @@ internal sealed class GeminiCodec : IProtocolCodec
             or "PROHIBITED_CONTENT"
             or "SPII"
             or "IMAGE_SAFETY";
+
+    ProviderRequestUsage? IProtocolCodec.ReadRequestUsage(JsonElement root, ProviderRequestUsage previous) =>
+        ReadRequestUsage(root, previous);
+
+    internal static ProviderRequestUsage? ReadRequestUsage(JsonElement root, ProviderRequestUsage previous)
+    {
+        var usage = RequestUsageFields.Object(root, "usageMetadata");
+        if (usage.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var thoughts = RequestUsageFields.Count(usage, "thoughtsTokenCount") ?? previous.ReasoningTokens;
+        // Gemini reports candidate tokens and thinking tokens separately.
+        var candidates = RequestUsageFields.Count(usage, "candidatesTokenCount")
+            ?? (previous.OutputTokens - (previous.ReasoningTokens ?? 0));
+        var output = candidates is { } count && count <= long.MaxValue - (thoughts ?? 0)
+            ? count + thoughts.GetValueOrDefault()
+            : (long?)null;
+        return new ProviderRequestUsage(
+            0, RequestUsageFields.Count(usage, "promptTokenCount"), output, thoughts,
+            RequestUsageFields.Count(usage, "cachedContentTokenCount"));
+    }
 
     internal static TokenUsage? ReadUsage(JsonElement root)
     {

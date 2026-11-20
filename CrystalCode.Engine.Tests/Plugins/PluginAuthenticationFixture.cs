@@ -162,7 +162,9 @@ public sealed class PluginAuthenticationFixture : IDisposable
                     var recorder = new Recorder();
                     request.Handler.InnerHandler = recorder;
                     using var http = request.CreateHttpClient(TimeSpan.FromSeconds(5));
+                    var context = request.RequestContext?.Invoke();
                     http.GetAsync("https://example.test/v1/ping").GetAwaiter().GetResult();
+                    context?.ReportUsage(new ProviderRequestUsage(1, InputTokens: 100, CacheReadTokens: 60));
                     throw new InvalidOperationException("sent:" + recorder.Token + " key=" + request.ApiKey.Length);
                 }
             }

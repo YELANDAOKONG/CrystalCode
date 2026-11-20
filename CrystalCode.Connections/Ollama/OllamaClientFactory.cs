@@ -3,6 +3,7 @@ using Crystal.Multimodal.Chat;
 using CrystalCode.Engine.Authentication;
 using CrystalCode.Engine.Configuration;
 using CrystalCode.Engine.Plugins.Interfaces;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Ollama;
 
 namespace CrystalCode.Connections.Ollama;
@@ -23,19 +24,31 @@ public sealed class OllamaClientFactory : IChatClientFactory
         string apiKey) =>
         CreateMultimodal(settings, new ProviderCredential(apiKey));
 
-    public IStreamingChatClient Create(HarnessSettings settings, ProviderCredential credential)
+    public IStreamingChatClient Create(HarnessSettings settings, ProviderCredential credential) =>
+        OpenText(settings, credential, null);
+
+    public IStreamingChatClient Create(
+        HarnessSettings settings, ProviderCredential credential, Func<ProviderRequestContext> requestContext) =>
+        OpenText(settings, credential, requestContext);
+
+    private static IStreamingChatClient OpenText(
+        HarnessSettings settings, ProviderCredential credential, Func<ProviderRequestContext>? requestContext)
     {
-        ArgumentNullException.ThrowIfNull(settings);
-        ArgumentNullException.ThrowIfNull(credential);
-        var options = CreateOptions(settings, credential);
+        var options = CreateOptions(settings, credential) with { RequestContext = requestContext };
         return new OllamaProvider(options, CredentialHttp.Client(credential, options.RequestTimeout), settings.EffectiveHttpHeaders);
     }
 
+    public IStreamingMultimodalChatClient CreateMultimodal(HarnessSettings settings, ProviderCredential credential) =>
+        OpenMultimodal(settings, credential, null);
+
     public IStreamingMultimodalChatClient CreateMultimodal(
-        HarnessSettings settings,
-        ProviderCredential credential)
+        HarnessSettings settings, ProviderCredential credential, Func<ProviderRequestContext> requestContext) =>
+        OpenMultimodal(settings, credential, requestContext);
+
+    private static IStreamingMultimodalChatClient OpenMultimodal(
+        HarnessSettings settings, ProviderCredential credential, Func<ProviderRequestContext>? requestContext)
     {
-        var options = CreateOptions(settings, credential);
+        var options = CreateOptions(settings, credential) with { RequestContext = requestContext };
         return new OllamaMultimodalProvider(options, CredentialHttp.Client(credential, options.RequestTimeout), settings.EffectiveHttpHeaders);
     }
 

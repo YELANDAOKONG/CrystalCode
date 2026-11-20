@@ -5,6 +5,7 @@ using Crystal;
 using Crystal.Media;
 using Crystal.Multimodal;
 using Crystal.Multimodal.Chat;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
 using CrystalCode.Providers.Protocol.Interfaces;
@@ -14,6 +15,9 @@ namespace CrystalCode.Providers.Ollama;
 internal sealed class OllamaMultimodalCodec : IMultimodalProtocolCodec
 {
     private readonly OllamaCodec _text = new();
+
+    public ProviderRequestUsage? ReadRequestUsage(JsonElement root, ProviderRequestUsage previous) =>
+        OllamaCodec.ReadRequestUsage(root);
 
     public string Path => _text.Path;
 

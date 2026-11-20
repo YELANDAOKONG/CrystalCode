@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
+using CrystalCode.Plugins.Clients;
 
 namespace CrystalCode.Providers.Gemini;
 
@@ -74,6 +75,8 @@ public sealed record GeminiOptions
 
     public string? Speed { get; }
 
+    public Func<ProviderRequestContext>? RequestContext { get; init; }
+
     internal ProtocolOptions ToProtocolOptions() =>
         new(
             ApiKey,
@@ -85,7 +88,10 @@ public sealed record GeminiOptions
             RequestTimeout,
             VendorName,
             ServiceTier,
-            Speed);
+            Speed)
+        {
+            RequestContext = RequestContext
+        };
 
     public override string ToString() => nameof(GeminiOptions);
 }

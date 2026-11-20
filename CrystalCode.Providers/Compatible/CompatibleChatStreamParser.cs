@@ -24,7 +24,7 @@ internal sealed class CompatibleChatStreamParser
         _candidates.Count > 0
         && _candidates.Values.All(static candidate => candidate.Completed);
 
-    public IReadOnlyList<ChatStreamEvent> Parse(string data)
+    public IReadOnlyList<ChatStreamEvent> Parse(string data, Action<JsonElement>? observe = null)
     {
         JsonDocument document;
         try
@@ -40,6 +40,7 @@ internal sealed class CompatibleChatStreamParser
 
         using (document)
         {
+            observe?.Invoke(document.RootElement);
             return Parse(document.RootElement);
         }
     }

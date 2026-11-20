@@ -20,7 +20,7 @@ internal interface IProtocolCodec
 
     void AddRequestHeaders(HttpRequestMessage request, ProtocolOptions options) { }
 
-    ProviderRequestUsage? ReadRequestUsage(JsonElement root) => null;
+    ProviderRequestUsage? ReadRequestUsage(JsonElement root, ProviderRequestUsage previous) => null;
 
     ChatResponse ReadResponse(JsonElement root);
 

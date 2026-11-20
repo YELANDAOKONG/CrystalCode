@@ -8,6 +8,8 @@ using Crystal.Media;
 using Crystal.Multimodal;
 using Crystal.Multimodal.Chat;
 
+using CrystalCode.Providers.Protocol;
+
 namespace CrystalCode.Providers.Compatible;
 
 internal sealed class CompatibleMultimodalChatClient
@@ -57,26 +59,28 @@ internal sealed class CompatibleMultimodalChatClient
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        using var tracking = new ProtocolRequestTracking(_options.RequestContext, CompatibleWire.ReadRequestUsage);
         var body = CompatibleMultimodalRequestWriter.Write(
             _profile,
             _options,
             request,
             stream: false);
-        using var response = await SendAsync(body, stream: false, cancellationToken)
+        using var response = await SendAsync(tracking, body, stream: false, cancellationToken)
             .ConfigureAwait(false);
         var payload = await response.Content.ReadAsStringAsync(cancellationToken)
             .ConfigureAwait(false);
-        if (CompatibleWire.TryReadError(payload, out var code, out var providerMessage))
-        {
-            throw _profile.Faults.FromResponseError(
-                _profile.VendorName,
-                code,
-                providerMessage);
-        }
-
         try
         {
             using var document = JsonDocument.Parse(payload);
+            tracking.Observe(document.RootElement);
+            if (CompatibleWire.TryReadError(document.RootElement, out var code, out var providerMessage))
+            {
+                throw _profile.Faults.FromResponseError(
+                    _profile.VendorName,
+                    code,
+                    providerMessage);
+            }
+
             return CompatibleMultimodalOutput.Convert(
                 CompatibleChatResponseReader.Read(_profile, document.RootElement));
         }
@@ -93,12 +97,13 @@ internal sealed class CompatibleMultimodalChatClient
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        using var tracking = new ProtocolRequestTracking(_options.RequestContext, CompatibleWire.ReadRequestUsage);
         var body = CompatibleMultimodalRequestWriter.Write(
             _profile,
             _options,
             request,
             stream: true);
-        using var response = await SendAsync(body, stream: true, cancellationToken)
+        using var response = await SendAsync(tracking, body, stream: true, cancellationToken)
             .ConfigureAwait(false);
         await using var content = await response.Content.ReadAsStreamAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -109,9 +114,10 @@ internal sealed class CompatibleMultimodalChatClient
             reader,
             _profile.Faults,
             _profile.VendorName,
+            tracking.Observe,
             cancellationToken))
         {
-            foreach (var streamEvent in parser.Parse(data))
+            foreach (var streamEvent in parser.Parse(data, tracking.Observe))
             {
                 foreach (var converted in output.Convert(streamEvent))
                 {
@@ -144,6 +150,7 @@ internal sealed class CompatibleMultimodalChatClient
     }
 
     private async Task<HttpResponseMessage> SendAsync(
+        ProtocolRequestTracking tracking,
         byte[] body,
         bool stream,
         CancellationToken cancellationToken)
@@ -170,6 +177,7 @@ internal sealed class CompatibleMultimodalChatClient
 
         RequestHeaders.Apply(request, _httpHeaders);
 
+        cancellationToken.ThrowIfCancellationRequested();
         HttpResponseMessage? response = null;
         try
         {
@@ -189,7 +197,8 @@ internal sealed class CompatibleMultimodalChatClient
             throw _profile.Faults.FromResponse(
                 response.StatusCode,
                 errorBody,
-                response.Headers);
+                response.Headers,
+                tracking.Observe);
         }
         catch (OperationCanceledException)
         {
@@ -209,6 +218,10 @@ internal sealed class CompatibleMultimodalChatClient
                     $"{_profile.VendorName} chat request failed.",
                     exception),
                 innerException: exception);
+        }
+        finally
+        {
+            tracking.RecordAttempts(request);
         }
     }
 }

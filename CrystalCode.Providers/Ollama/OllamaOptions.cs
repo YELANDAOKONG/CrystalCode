@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
+using CrystalCode.Plugins.Clients;
 
 namespace CrystalCode.Providers.Ollama;
 
@@ -72,6 +73,8 @@ public sealed record OllamaOptions
 
     public string? Speed { get; }
 
+    public Func<ProviderRequestContext>? RequestContext { get; init; }
+
     internal ProtocolOptions ToProtocolOptions() =>
         new(
             ApiKey,
@@ -83,7 +86,10 @@ public sealed record OllamaOptions
             RequestTimeout,
             VendorName,
             ServiceTier,
-            Speed);
+            Speed)
+        {
+            RequestContext = RequestContext
+        };
 
     public override string ToString() => nameof(OllamaOptions);
 }

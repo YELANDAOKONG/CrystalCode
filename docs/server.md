@@ -446,8 +446,11 @@ unwrapped, so a child's text arrives as `stream.text` with a `source`. Every
 
 When `/status full` has provider request diagnostics, `report.status` includes
 `status.requestUsage`. Each entry carries `scope`, `provider`, `model`,
-`httpAttempts`, `usageReports`, and nullable `inputTokens`, `outputTokens`,
-`reasoningTokens`, `cacheReadTokens`, and `cacheWriteTokens`.
+`httpAttempts`, `requestCount`, `usageReports`, and nullable `inputTokens`,
+`outputTokens`, `reasoningTokens`, `cacheReadTokens`, `cacheWriteTokens`,
+and `uncachedInputTokens`. The `coverage` object gives each token field's
+report count. Optional `cacheWritesByLifetime` entries carry
+`lifetimeSeconds`, `tokens`, and `reports`.
 
 The chrome object in `session.started`, `chrome.changed`, and the snapshot
 names the active `provider` and `model` along with the `sessionId`, workspace, mode, approval,

@@ -4,6 +4,9 @@ using System.Text.Json;
 using Crystal;
 using Crystal.Reasoning;
 
+using CrystalCode.Plugins.Clients;
+using CrystalCode.Providers.Protocol;
+
 namespace CrystalCode.Providers.Compatible;
 
 internal static class CompatibleWire
@@ -106,6 +109,28 @@ internal static class CompatibleWire
         return TryReadError(body, out var code, out var message, observe)
             ? (code, message)
             : (null, null);
+    }
+
+    public static ProviderRequestUsage? ReadRequestUsage(JsonElement root, ProviderRequestUsage previous)
+    {
+        var usage = RequestUsageFields.Object(root, "usage");
+        if (usage.ValueKind == JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        var prompt = RequestUsageFields.Object(usage, "prompt_tokens_details");
+        var completion = RequestUsageFields.Object(usage, "completion_tokens_details");
+        return new ProviderRequestUsage(
+            0,
+            RequestUsageFields.Count(usage, "prompt_tokens"),
+            RequestUsageFields.Count(usage, "completion_tokens"),
+            RequestUsageFields.Count(completion, "reasoning_tokens"),
+            RequestUsageFields.Count(prompt, "cached_tokens") ?? RequestUsageFields.Count(usage, "prompt_cache_hit_tokens"),
+            RequestUsageFields.Count(prompt, "cache_write_tokens"))
+        {
+            UncachedInputTokens = RequestUsageFields.Count(usage, "prompt_cache_miss_tokens")
+        };
     }
 
     public static bool TryReadError(

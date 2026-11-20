@@ -5,6 +5,8 @@ using System.Text.Json;
 
 using Crystal.Chat;
 
+using CrystalCode.Providers.Protocol;
+
 namespace CrystalCode.Providers.Compatible;
 
 internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
@@ -46,24 +48,26 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        using var tracking = new ProtocolRequestTracking(_options.RequestContext, CompatibleWire.ReadRequestUsage);
 
         var body = CompatibleChatRequestWriter.Write(_profile, _options, request, stream: false);
-        using var response = await SendAsync(body, stream: false, cancellationToken)
+        using var response = await SendAsync(tracking, body, stream: false, cancellationToken)
             .ConfigureAwait(false);
         var payload = await response.Content
             .ReadAsStringAsync(cancellationToken)
             .ConfigureAwait(false);
-        if (CompatibleWire.TryReadError(payload, out var code, out var providerMessage))
-        {
-            throw _profile.Faults.FromResponseError(
-                _profile.VendorName,
-                code,
-                providerMessage);
-        }
-
         try
         {
             using var document = JsonDocument.Parse(payload);
+            tracking.Observe(document.RootElement);
+            if (CompatibleWire.TryReadError(document.RootElement, out var code, out var providerMessage))
+            {
+                throw _profile.Faults.FromResponseError(
+                    _profile.VendorName,
+                    code,
+                    providerMessage);
+            }
+
             return CompatibleChatResponseReader.Read(_profile, document.RootElement);
         }
         catch (JsonException exception)
@@ -79,9 +83,10 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        using var tracking = new ProtocolRequestTracking(_options.RequestContext, CompatibleWire.ReadRequestUsage);
 
         var body = CompatibleChatRequestWriter.Write(_profile, _options, request, stream: true);
-        using var response = await SendAsync(body, stream: true, cancellationToken)
+        using var response = await SendAsync(tracking, body, stream: true, cancellationToken)
             .ConfigureAwait(false);
         await using var content = await response.Content
             .ReadAsStreamAsync(cancellationToken)
@@ -93,9 +98,10 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
             reader,
             _profile.Faults,
             _profile.VendorName,
+            tracking.Observe,
             cancellationToken))
         {
-            foreach (var streamEvent in parser.Parse(data))
+            foreach (var streamEvent in parser.Parse(data, tracking.Observe))
             {
                 yield return streamEvent;
             }
@@ -122,6 +128,7 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
     }
 
     private async Task<HttpResponseMessage> SendAsync(
+        ProtocolRequestTracking tracking,
         byte[] body,
         bool stream,
         CancellationToken cancellationToken)
@@ -158,6 +165,7 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
 
         RequestHeaders.Apply(request, _httpHeaders);
 
+        cancellationToken.ThrowIfCancellationRequested();
         HttpResponseMessage? response = null;
         try
         {
@@ -175,7 +183,8 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
             throw _profile.Faults.FromResponse(
                 response.StatusCode,
                 errorBody,
-                response.Headers);
+                response.Headers,
+                tracking.Observe);
         }
         catch (OperationCanceledException)
         {
@@ -195,6 +204,10 @@ internal sealed class CompatibleChatClient : IStreamingChatClient, IDisposable
                     $"{_profile.VendorName} chat request failed.",
                     exception),
                 innerException: exception);
+        }
+        finally
+        {
+            tracking.RecordAttempts(request);
         }
     }
 }

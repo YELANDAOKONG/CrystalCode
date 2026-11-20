@@ -144,15 +144,7 @@ public static class StatusText
                 AddSection(
                     lines,
                     $"{usage.Scope} requests ({usage.Provider} / {usage.Model})",
-                    [
-                        ("HTTP attempts", Number(usage.HttpAttempts)),
-                        ("Usage reports", Number(usage.UsageReports)),
-                        ("Input", TokenValue(usage.InputTokens)),
-                        ("Cache reads", TokenValue(usage.CacheReadTokens)),
-                        ("Cache writes", TokenValue(usage.CacheWriteTokens)),
-                        ("Output", TokenValue(usage.OutputTokens)),
-                        ("Reasoning", TokenValue(usage.ReasoningTokens))
-                    ]);
+                    RequestUsageRows(usage));
             }
 
             AddSection(
@@ -183,6 +175,35 @@ public static class StatusText
 
         return string.Join(Environment.NewLine, lines);
     }
+
+    public static IReadOnlyList<(string Label, string Value)> RequestUsageRows(ProviderUsageSummary usage)
+    {
+        ArgumentNullException.ThrowIfNull(usage);
+        var coverage = usage.Coverage;
+        var requests = usage.RequestCount;
+        var rows = new List<(string Label, string Value)>
+        {
+            ("HTTP attempts", Number(usage.HttpAttempts)),
+            ("Usage reports", $"{Number(usage.UsageReports)} / {Number(requests)}"),
+            ("Input", ReportedTokens(usage.InputTokens, coverage.InputTokens, requests)),
+            ("Uncached input", ReportedTokens(usage.UncachedInputTokens, coverage.UncachedInputTokens, requests)),
+            ("Cache reads", ReportedTokens(usage.CacheReadTokens, coverage.CacheReadTokens, requests)),
+            ("Cache writes", ReportedTokens(usage.CacheWriteTokens, coverage.CacheWriteTokens, requests))
+        };
+        foreach (var writes in usage.CacheWritesByLifetime)
+        {
+            rows.Add(($"  {Number(writes.LifetimeSeconds)} s lifetime", ReportedTokens(writes.Tokens, writes.Reports, requests)));
+        }
+
+        rows.Add(("Output", ReportedTokens(usage.OutputTokens, coverage.OutputTokens, requests)));
+        rows.Add(("Reasoning", ReportedTokens(usage.ReasoningTokens, coverage.ReasoningTokens, requests)));
+        return rows.AsReadOnly();
+    }
+
+    private static string ReportedTokens(long? value, int reports, int requests) =>
+        value.HasValue && reports < requests
+            ? $"{Number(value.Value)} ({Number(reports)}/{Number(requests)} requests)"
+            : TokenValue(value);
 
     private static void AddSection(
         List<string> lines,

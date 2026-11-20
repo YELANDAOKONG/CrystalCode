@@ -9,6 +9,7 @@ using Crystal.Multimodal.Chat;
 using Crystal.Multimodal.Tools;
 using Crystal.Reasoning;
 using Crystal.Tools;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
 using CrystalCode.Providers.Protocol.Interfaces;
@@ -19,6 +20,9 @@ internal sealed class AnthropicMultimodalCodec : IMultimodalProtocolCodec
 {
     private readonly AnthropicCodec _textCodec;
     private readonly string _vendorName;
+
+    public ProviderRequestUsage? ReadRequestUsage(JsonElement root, ProviderRequestUsage previous) =>
+        AnthropicCodec.ReadRequestUsage(root, previous);
 
     public AnthropicMultimodalCodec(string vendorName, bool summarizeThinking = true)
     {

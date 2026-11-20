@@ -5,6 +5,7 @@ using Crystal;
 using Crystal.Media;
 using Crystal.Multimodal;
 using Crystal.Multimodal.Chat;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
 using CrystalCode.Providers.Protocol.Interfaces;
@@ -14,6 +15,9 @@ namespace CrystalCode.Providers.Gemini;
 internal sealed class GeminiMultimodalCodec : IMultimodalProtocolCodec
 {
     private readonly GeminiCodec _text;
+
+    public ProviderRequestUsage? ReadRequestUsage(JsonElement root, ProviderRequestUsage previous) =>
+        GeminiCodec.ReadRequestUsage(root, previous);
 
     public GeminiMultimodalCodec(string model) => _text = new GeminiCodec(model);
 

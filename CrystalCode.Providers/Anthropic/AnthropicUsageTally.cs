@@ -64,11 +64,21 @@ internal sealed class AnthropicUsageTally
 
     private static void Raise(ref long? field, long? value)
     {
-        if (value is not { } reported)
+        field = Largest(field, value);
+    }
+
+    internal static long? Largest(long? previous, long? reported) =>
+        reported is null ? previous : Math.Max(previous ?? 0, reported.Value);
+
+    internal static long? InputTotal(long? uncached, long? writes, long? reads)
+    {
+        if (uncached is not { } input || writes is not { } cacheWrites || reads is not { } cacheReads
+            || input > long.MaxValue - cacheWrites
+            || input + cacheWrites > long.MaxValue - cacheReads)
         {
-            return;
+            return null;
         }
 
-        field = field is { } current ? Math.Max(current, reported) : reported;
+        return input + cacheWrites + cacheReads;
     }
 }

@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using CrystalCode.Providers.Compatible;
 using CrystalCode.Providers.Protocol;
+using CrystalCode.Plugins.Clients;
 
 namespace CrystalCode.Providers.DeepSeek;
 
@@ -137,6 +138,8 @@ public sealed record DeepSeekOptions
 
     public string? Speed { get; }
 
+    public Func<ProviderRequestContext>? RequestContext { get; init; }
+
     internal CompatibleOptions ToCompatibleOptions() =>
         new(
             ApiKey,
@@ -149,5 +152,8 @@ public sealed record DeepSeekOptions
             organization: null,
             project: null,
             serviceTier: ServiceTier,
-            speed: Speed);
+            speed: Speed)
+        {
+            RequestContext = RequestContext
+        };
 }

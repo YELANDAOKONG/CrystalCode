@@ -25,7 +25,7 @@ internal interface IMultimodalProtocolCodec
 
     void AddRequestHeaders(HttpRequestMessage request, ProtocolOptions options) { }
 
-    ProviderRequestUsage? ReadRequestUsage(JsonElement root) => null;
+    ProviderRequestUsage? ReadRequestUsage(JsonElement root, ProviderRequestUsage previous) => null;
 
     MultimodalChatResponse ReadResponse(JsonElement root);
 

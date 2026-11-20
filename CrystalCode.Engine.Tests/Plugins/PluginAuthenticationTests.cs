@@ -8,6 +8,7 @@ using CrystalCode.Engine.Tests.Authentication;
 using CrystalCode.Engine.Tests.Home;
 using CrystalCode.Engine.Tests.Tools;
 using CrystalCode.Engine.Tools;
+using CrystalCode.Plugins.Clients;
 
 using Xunit;
 
@@ -112,10 +113,12 @@ public sealed class PluginAuthenticationTests : IClassFixture<PluginAuthenticati
         Assert.True(credentials.TryOpen(provider, catalog.FindIntegration, out var credential, out _));
         Assert.NotNull(credential.Handler);
 
-        var error = Assert.Throws<InvalidOperationException>(
-            () => catalog.TryCreateClient(Settings(provider), credential, out _));
+        var usage = new List<ProviderRequestUsage>();
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            catalog.TryCreateClient(Settings(provider), credential, () => new("session", null, usage.Add), out _));
 
         Assert.Equal("sent:plug-token key=0", error.Message);
+        Assert.Equal(new ProviderRequestUsage(1, InputTokens: 100, CacheReadTokens: 60), Assert.Single(usage));
     }
 
     [Fact]

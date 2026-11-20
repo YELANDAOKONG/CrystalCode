@@ -94,6 +94,9 @@ public sealed record PluginClientRequest
     /// </summary>
     public DelegatingHandler? Handler { get; init; }
 
+    /// <summary>Captures the active conversation and usage sink when a provider request starts.</summary>
+    public Func<ProviderRequestContext>? RequestContext { get; init; }
+
     /// <summary>
     /// Builds an HTTP client that sends through <see cref="Handler"/>. The
     /// client owns the handler and disposes it. Without a handler this is a

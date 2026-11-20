@@ -1,3 +1,5 @@
+using CrystalCode.Plugins.Clients;
+
 namespace CrystalCode.Providers.Compatible;
 
 internal sealed record CompatibleOptions
@@ -58,6 +60,8 @@ internal sealed record CompatibleOptions
     public string? ServiceTier { get; }
 
     public string? Speed { get; }
+
+    public Func<ProviderRequestContext>? RequestContext { get; init; }
 
     private static string? BlankToNull(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -485,6 +485,13 @@ public sealed class PluginCatalog
     public bool TryCreateOverrideClient(
         HarnessSettings settings,
         ProviderCredential credential,
+        out IStreamingChatClient? client) =>
+        TryCreateOverrideClient(settings, credential, null, out client);
+
+    internal bool TryCreateOverrideClient(
+        HarnessSettings settings,
+        ProviderCredential credential,
+        Func<ProviderRequestContext>? requestContext,
         out IStreamingChatClient? client)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -497,7 +504,7 @@ public sealed class PluginCatalog
                 continue;
             }
 
-            client = factory.Create(PluginClientRequests.From(settings, credential));
+            client = factory.Create(PluginClientRequests.From(settings, credential, requestContext));
             return true;
         }
 
@@ -518,7 +525,14 @@ public sealed class PluginCatalog
     public bool TryCreateClient(HarnessSettings settings, string apiKey, out IStreamingChatClient? client) =>
         TryCreateClient(settings, new ProviderCredential(apiKey), out client);
 
-    public bool TryCreateClient(HarnessSettings settings, ProviderCredential credential, out IStreamingChatClient? client)
+    public bool TryCreateClient(HarnessSettings settings, ProviderCredential credential, out IStreamingChatClient? client) =>
+        TryCreateClient(settings, credential, null, out client);
+
+    internal bool TryCreateClient(
+        HarnessSettings settings,
+        ProviderCredential credential,
+        Func<ProviderRequestContext>? requestContext,
+        out IStreamingChatClient? client)
     {
         ArgumentNullException.ThrowIfNull(settings);
         client = null;
@@ -530,7 +544,7 @@ public sealed class PluginCatalog
                 continue;
             }
 
-            client = factory.Create(PluginClientRequests.From(settings, credential));
+            client = factory.Create(PluginClientRequests.From(settings, credential, requestContext));
             return true;
         }
 
@@ -540,7 +554,11 @@ public sealed class PluginCatalog
     public IStreamingMultimodalChatClient? CreateMultimodal(HarnessSettings settings, string apiKey) =>
         CreateMultimodal(settings, new ProviderCredential(apiKey));
 
-    public IStreamingMultimodalChatClient? CreateMultimodal(HarnessSettings settings, ProviderCredential credential)
+    public IStreamingMultimodalChatClient? CreateMultimodal(HarnessSettings settings, ProviderCredential credential) =>
+        CreateMultimodal(settings, credential, null);
+
+    internal IStreamingMultimodalChatClient? CreateMultimodal(
+        HarnessSettings settings, ProviderCredential credential, Func<ProviderRequestContext>? requestContext)
     {
         ArgumentNullException.ThrowIfNull(settings);
         if (!settings.ActiveModel.ImageInput)
@@ -556,7 +574,7 @@ public sealed class PluginCatalog
                 continue;
             }
 
-            return factory.CreateMultimodal(PluginClientRequests.From(settings, credential));
+            return factory.CreateMultimodal(PluginClientRequests.From(settings, credential, requestContext));
         }
 
         return null;

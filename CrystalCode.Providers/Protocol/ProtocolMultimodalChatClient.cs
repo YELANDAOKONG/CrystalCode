@@ -48,10 +48,10 @@ internal sealed class ProtocolMultimodalChatClient
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        using var tracking = new ProtocolRequestTracking(_options, _codec.ReadRequestUsage);
+        using var tracking = new ProtocolRequestTracking(_options.RequestContext, _codec.ReadRequestUsage);
         if (_codec.StreamCompletionReader is { } readCompletion)
         {
-            var streamedBody = _codec.WriteRequest(tracking.Options, request, stream: true);
+            var streamedBody = _codec.WriteRequest(tracking.Bind(_options), request, stream: true);
             using var streamedResponse = await SendAsync(tracking, streamedBody, stream: true, cancellationToken)
                 .ConfigureAwait(false);
             return await ProtocolStream.ReadCompletionAsync(streamedResponse.Content, _options.VendorName,
@@ -60,7 +60,7 @@ internal sealed class ProtocolMultimodalChatClient
                 .ConfigureAwait(false);
         }
 
-        var body = _codec.WriteRequest(tracking.Options, request, stream: false);
+        var body = _codec.WriteRequest(tracking.Bind(_options), request, stream: false);
         using var response = await SendAsync(tracking, body, stream: false, cancellationToken)
             .ConfigureAwait(false);
         var payload = await response.Content.ReadAsStringAsync(cancellationToken)
@@ -84,8 +84,8 @@ internal sealed class ProtocolMultimodalChatClient
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
-        using var tracking = new ProtocolRequestTracking(_options, _codec.ReadRequestUsage);
-        var body = _codec.WriteRequest(tracking.Options, request, stream: true);
+        using var tracking = new ProtocolRequestTracking(_options.RequestContext, _codec.ReadRequestUsage);
+        var body = _codec.WriteRequest(tracking.Bind(_options), request, stream: true);
         using var response = await SendAsync(tracking, body, stream: true, cancellationToken)
             .ConfigureAwait(false);
         await using var content = await response.Content.ReadAsStreamAsync(cancellationToken)
@@ -161,7 +161,7 @@ internal sealed class ProtocolMultimodalChatClient
                     ? "application/x-ndjson"
                     : stream ? "text/event-stream" : "application/json"));
         _codec.AddHeaders(request, _options.ApiKey);
-        _codec.AddRequestHeaders(request, tracking.Options);
+        _codec.AddRequestHeaders(request, tracking.Bind(_options));
 
         RequestHeaders.Apply(request, _httpHeaders);
 

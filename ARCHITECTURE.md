@@ -2544,14 +2544,23 @@ persistent chrome remains the smallest live summary.
 request breakdown for `/status full`; its output does not depend on status-line
 customization.
 
-When the Responses adapter reports request diagnostics, `/status full`
+When an adapter reports request diagnostics, `/status full`
 groups them by main, child, or auxiliary work and by provider and model.
 The collection starts fresh with each turn or session change, and an
 in-flight request reports to the collection it started with. Rows show
-HTTP attempts, how many calls returned a usage report, and the sums of
-reported input, output, reasoning, cache-read, and cache-write tokens. A
-missing field remains unknown when no call supplied it. The existing
-context accounting and session token totals use the Crystal usage contract.
+HTTP attempts, requests, how many requests returned a usage report, and
+the sums of reported input, uncached input, output, reasoning, cache reads
+and cache writes. Writes can also be broken down by lifetime. Coverage is
+recorded separately for each metric. An absent field stays unknown, an
+explicit zero counts as a report, and partial totals retain their coverage.
+Across the six built-in protocols, text and multimodal calls use protocol
+usage fields. The transport retains previously reported fields when a
+later cumulative stream event omits them. Anthropic combines its separate
+input and cache counts when all three are known. DeepSeek's cache misses
+are uncached input.
+Plugin factories receive the same optional request context through
+`PluginClientRequest`. The existing context accounting and session token
+totals use the Crystal usage contract.
 The ChatGPT handler counts inference sends after it obtains a token, so a
 failed token lookup or refresh before the first send contributes zero. A
 JSON error body returned in place of an event stream still contributes

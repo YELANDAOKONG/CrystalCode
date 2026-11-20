@@ -59,8 +59,8 @@ internal sealed class ResponsesMultimodalCodec : IMultimodalProtocolCodec
     public void AddRequestHeaders(HttpRequestMessage request, ProtocolOptions options) =>
         _textCodec.AddRequestHeaders(request, options);
 
-    public ProviderRequestUsage? ReadRequestUsage(JsonElement root) =>
-        _textCodec.ReadRequestUsage(root);
+    public ProviderRequestUsage? ReadRequestUsage(JsonElement root, ProviderRequestUsage previous) =>
+        _textCodec.ReadRequestUsage(root, previous);
 
     public byte[] WriteRequest(
         ProtocolOptions options,

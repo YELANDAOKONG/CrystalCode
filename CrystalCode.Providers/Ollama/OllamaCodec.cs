@@ -6,6 +6,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Protocol;
 using CrystalCode.Providers.Protocol.Interfaces;
 
@@ -280,6 +281,19 @@ internal sealed class OllamaCodec : IProtocolCodec
         }
 
         return new FinishReason(reason);
+    }
+
+    ProviderRequestUsage? IProtocolCodec.ReadRequestUsage(JsonElement root, ProviderRequestUsage previous) =>
+        ReadRequestUsage(root);
+
+    internal static ProviderRequestUsage? ReadRequestUsage(JsonElement root)
+    {
+        var input = RequestUsageFields.Count(root, "prompt_eval_count");
+        var output = RequestUsageFields.Count(root, "eval_count");
+        var cached = RequestUsageFields.Count(root, "prompt_eval_cached_count");
+        return input is null && output is null && cached is null
+            ? null
+            : new ProviderRequestUsage(0, input, output, CacheReadTokens: cached);
     }
 
     internal static TokenUsage? ReadUsage(JsonElement root)

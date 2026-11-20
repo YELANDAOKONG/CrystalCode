@@ -1372,6 +1372,7 @@ public sealed class CodingSession : ITurnObserver
         _grants = new GrantStore(home);
         _trust = new WorkspaceTrustStore(home);
         _home = home;
+        _providerUsage = new ProviderUsageLedger(sessionLock.Id);
         _modes = ModeCatalog.Load(home, _workspace.Root);
         _skillDiscovery = SkillDiscovery.Create(home);
         _modelView = new PluginModelView(CurrentPluginModel, CurrentPluginReview);
@@ -1388,7 +1389,6 @@ public sealed class CodingSession : ITurnObserver
         _prompts = _promptResolution.Prompts;
         ReloadSkills();
         _sessionId = sessionLock.Id;
-        _providerUsage = new ProviderUsageLedger(_sessionId);
         _sessionLock = sessionLock;
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
@@ -6478,7 +6478,8 @@ public sealed class CodingSession : ITurnObserver
             throw new InvalidOperationException(error);
         }
 
-        if (_loadedPlugins.TryCreateOverrideClient(settings, credential, out var overridden)
+        ProviderRequestContext RequestContext() => CaptureProviderRequest(settings, auxiliary);
+        if (_loadedPlugins.TryCreateOverrideClient(settings, credential, RequestContext, out var overridden)
             && overridden is not null)
         {
             return overridden;
@@ -6486,10 +6487,10 @@ public sealed class CodingSession : ITurnObserver
 
         try
         {
-            return _plugins.CreateClient(settings, credential, () => CaptureProviderRequest(settings, auxiliary));
+            return _plugins.CreateClient(settings, credential, RequestContext);
         }
         catch (NotSupportedException) when (
-            _loadedPlugins.TryCreateClient(settings, credential, out var client) && client is not null)
+            _loadedPlugins.TryCreateClient(settings, credential, RequestContext, out var client) && client is not null)
         {
             return client;
         }
@@ -6518,7 +6519,7 @@ public sealed class CodingSession : ITurnObserver
         }
         else
         {
-            client = _loadedPlugins.CreateMultimodal(settings, credential);
+            client = _loadedPlugins.CreateMultimodal(settings, credential, () => CaptureProviderRequest(settings, auxiliary));
         }
         if (client is not null && !client.Capabilities.Inputs.Any(input => input.Modality == ContentModality.Image))
         {

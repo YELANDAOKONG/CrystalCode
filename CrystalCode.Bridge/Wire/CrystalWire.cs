@@ -503,12 +503,35 @@ internal static class CrystalWire
                 writer.WriteString("provider", usage.Provider);
                 writer.WriteString("model", usage.Model);
                 writer.WriteNumber("httpAttempts", usage.HttpAttempts);
+                writer.WriteNumber("requestCount", usage.RequestCount);
                 writer.WriteNumber("usageReports", usage.UsageReports);
                 WriteUsageCount(writer, "inputTokens", usage.InputTokens);
                 WriteUsageCount(writer, "outputTokens", usage.OutputTokens);
                 WriteUsageCount(writer, "reasoningTokens", usage.ReasoningTokens);
                 WriteUsageCount(writer, "cacheReadTokens", usage.CacheReadTokens);
                 WriteUsageCount(writer, "cacheWriteTokens", usage.CacheWriteTokens);
+                WriteUsageCount(writer, "uncachedInputTokens", usage.UncachedInputTokens);
+                writer.WriteStartObject("coverage");
+                writer.WriteNumber("inputTokens", usage.Coverage.InputTokens);
+                writer.WriteNumber("outputTokens", usage.Coverage.OutputTokens);
+                writer.WriteNumber("reasoningTokens", usage.Coverage.ReasoningTokens);
+                writer.WriteNumber("cacheReadTokens", usage.Coverage.CacheReadTokens);
+                writer.WriteNumber("cacheWriteTokens", usage.Coverage.CacheWriteTokens);
+                writer.WriteNumber("uncachedInputTokens", usage.Coverage.UncachedInputTokens);
+                writer.WriteEndObject();
+                if (usage.CacheWritesByLifetime.Count > 0)
+                {
+                    writer.WriteStartArray("cacheWritesByLifetime");
+                    foreach (var writes in usage.CacheWritesByLifetime)
+                    {
+                        writer.WriteStartObject();
+                        writer.WriteNumber("lifetimeSeconds", writes.LifetimeSeconds);
+                        writer.WriteNumber("tokens", writes.Tokens);
+                        writer.WriteNumber("reports", writes.Reports);
+                        writer.WriteEndObject();
+                    }
+                    writer.WriteEndArray();
+                }
                 writer.WriteEndObject();
             }
             writer.WriteEndArray();

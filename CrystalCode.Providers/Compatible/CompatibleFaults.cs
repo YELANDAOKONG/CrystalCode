@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text.Json;
 
 namespace CrystalCode.Providers.Compatible;
 
@@ -40,11 +41,12 @@ internal sealed class CompatibleFaults
     public Exception FromResponse(
         HttpStatusCode statusCode,
         string body,
-        HttpResponseHeaders headers)
+        HttpResponseHeaders headers,
+        Action<JsonElement>? observe = null)
     {
         ArgumentNullException.ThrowIfNull(headers);
         var status = (int)statusCode;
-        CompatibleWire.TryReadError(body, out var code, out var providerMessage);
+        CompatibleWire.TryReadError(body, out var code, out var providerMessage, observe);
         var message = code is null
             ? $"Chat request failed (HTTP {status})."
             : $"Chat request failed (HTTP {status}, code: {code}).";
@@ -87,10 +89,10 @@ internal sealed class CompatibleFaults
             errorCode: code);
     }
 
-    public Exception InvalidStreamBody(string vendorName, string body)
+    public Exception InvalidStreamBody(string vendorName, string body, Action<JsonElement>? observe = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(vendorName);
-        if (CompatibleWire.TryReadError(body, out var code, out var providerMessage))
+        if (CompatibleWire.TryReadError(body, out var code, out var providerMessage, observe))
         {
             return FromStreamError(vendorName, code, providerMessage);
         }

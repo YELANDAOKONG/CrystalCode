@@ -703,7 +703,7 @@ internal sealed class ResponsesCodec : IProtocolCodec
         return new TokenUsage(input, output, reasoning);
     }
 
-    public ProviderRequestUsage? ReadRequestUsage(JsonElement root)
+    public ProviderRequestUsage? ReadRequestUsage(JsonElement root, ProviderRequestUsage previous)
     {
         if (root.ValueKind != JsonValueKind.Object)
         {
@@ -734,7 +734,12 @@ internal sealed class ResponsesCodec : IProtocolCodec
             OutputTokens: TryReadCount(usage, "output_tokens", "completion_tokens", out var output) && output >= 0 ? output : null,
             ReasoningTokens: hasReasoning && reasoning >= 0 ? reasoning : null,
             CacheReadTokens: ReadCacheCount(details, "cached_tokens"),
-            CacheWriteTokens: ReadCacheCount(details, "cache_write_tokens"));
+            CacheWriteTokens: ReadCacheCount(details, "cache_write_tokens"))
+        {
+            CacheWritesByLifetime = RequestUsageFields.CacheWrites(
+                RequestUsageFields.Object(details, "cache_write_tokens_details"),
+                ("ttl_30m_tokens", 30 * 60), ("ttl_12h_tokens", 12 * 60 * 60))
+        };
     }
 
     private static long? ReadCacheCount(JsonElement details, string name) =>

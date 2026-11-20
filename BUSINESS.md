@@ -460,8 +460,10 @@ separate library with no terminal code. The product can:
   Responses models so the provider can cache stable instructions. Models can
   override the format, and compatible gateways can opt in;
 - send session affinity by default for official ChatGPT account Responses
-  calls and allow a per-model opt-in to a prompt cache key. Show provider
-  request attempts and reported cache tokens in the detailed status report;
+  calls and allow a per-model opt-in to a prompt cache key;
+- show provider request attempts and reported cache tokens for built-in providers and
+  participating plugin providers in the detailed status report, with
+  coverage for each reported metric;
 - sign in to a provider with an account instead of an API key. A provider
   definition with `type` `authentication` names an authentication integration
   and lists its own models. `crystal login <provider>` and `/login` run the

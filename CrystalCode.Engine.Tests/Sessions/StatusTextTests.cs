@@ -1,7 +1,10 @@
+using System.Collections.Immutable;
+
 using Crystal;
 
 using CrystalCode.Engine.Approvals;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Plugins.Clients;
 
 using Xunit;
 
@@ -9,6 +12,31 @@ namespace CrystalCode.Engine.Tests.Sessions;
 
 public sealed class StatusTextTests
 {
+    [Fact]
+    public void RequestUsageRows_ShowCoverageForKnownAndMissingFieldsSeparately()
+    {
+        var ledger = new ProviderUsageLedger("session");
+        ledger.Record("Main", "relay", "model", new ProviderRequestUsage(2, InputTokens: 100, CacheReadTokens: 0)
+        {
+            CacheWritesByLifetime = ImmutableDictionary<int, long>.Empty.Add(300, 5)
+        });
+        ledger.Record("Main", "relay", "model", new ProviderRequestUsage(1, InputTokens: 50));
+        ledger.Record("Main", "relay", "model", new ProviderRequestUsage(1));
+
+        var usage = Assert.Single(ledger.Snapshot());
+        Assert.Equal(3, usage.RequestCount);
+        Assert.Equal(4, usage.HttpAttempts);
+        Assert.Equal(2, usage.UsageReports);
+        Assert.Equal(2, usage.Coverage.InputTokens);
+        Assert.Equal(1, usage.Coverage.CacheReadTokens);
+        Assert.Equal(0, usage.Coverage.CacheWriteTokens);
+        var rows = StatusText.RequestUsageRows(usage).ToDictionary(row => row.Label, row => row.Value);
+        Assert.Equal("150 (2/3 requests)", rows["Input"]);
+        Assert.Equal("0 (1/3 requests)", rows["Cache reads"]);
+        Assert.Equal("--", rows["Cache writes"]);
+        Assert.Equal("5 (1/3 requests)", rows["  300 s lifetime"]);
+    }
+
     [Fact]
     public void Format_IncludesDetailedSessionModelActivityAndCapabilities()
     {

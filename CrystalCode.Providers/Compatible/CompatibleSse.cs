@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
 
 namespace CrystalCode.Providers.Compatible;
 
@@ -14,6 +15,7 @@ internal static class CompatibleSse
         StreamReader reader,
         CompatibleFaults faults,
         string vendorName,
+        Action<JsonElement> observe,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(reader);
@@ -31,7 +33,7 @@ internal static class CompatibleSse
                 payload.Append('\n');
                 payload.Append(
                     await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false));
-                throw faults.InvalidStreamBody(vendorName, payload.ToString());
+                throw faults.InvalidStreamBody(vendorName, payload.ToString(), observe);
             }
 
             if (!line.StartsWith("data:", StringComparison.Ordinal))

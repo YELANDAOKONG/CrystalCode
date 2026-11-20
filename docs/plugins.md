@@ -172,6 +172,12 @@ a letter, then letters, digits, `_`, or `-`. Put that token in
 log the key. `HttpHeaders` contains the effective global and endpoint request
 headers. Apply them to each request, validate them for the protocol, and keep
 their values out of diagnostics.
+`RequestContext` is an optional accessor. Invoke it for each model request
+and retain that request's result through completion, failure, or cancellation.
+Call `ReportUsage` once with the actual inference attempts and the fields the
+provider reported. Leave unavailable fields null and preserve explicit zero
+counts. Cache write breakdown keys are lifetimes in seconds. Both ordinary and
+built-in override factories receive this accessor for text and multimodal clients.
 `ModelOptions` carries the model's JSON `options` object, or null
 when omitted. The factory interprets and validates the object. Read sampling
 settings there in place of the former `Temperature` and `TopP` properties.

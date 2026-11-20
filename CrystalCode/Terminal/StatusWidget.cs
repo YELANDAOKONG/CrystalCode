@@ -145,16 +145,7 @@ internal static class StatusWidget
             foreach (var usage in status.RequestUsage ?? [])
             {
                 blocks.Add(SectionRule($"{usage.Scope} requests ({usage.Provider} / {usage.Model})"));
-                blocks.Add(FieldGrid(
-                [
-                    ("HTTP attempts", Number(usage.HttpAttempts)),
-                    ("Usage reports", Number(usage.UsageReports)),
-                    ("Input", TokenValue(usage.InputTokens)),
-                    ("Cache reads", TokenValue(usage.CacheReadTokens)),
-                    ("Cache writes", TokenValue(usage.CacheWriteTokens)),
-                    ("Output", TokenValue(usage.OutputTokens)),
-                    ("Reasoning", TokenValue(usage.ReasoningTokens))
-                ]));
+                blocks.Add(FieldGrid(StatusText.RequestUsageRows(usage)));
             }
         }
 

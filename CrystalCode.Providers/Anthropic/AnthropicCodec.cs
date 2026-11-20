@@ -548,6 +548,34 @@ internal sealed class AnthropicCodec : IProtocolCodec
         _ => new FinishReason(reason)
     };
 
+    ProviderRequestUsage? IProtocolCodec.ReadRequestUsage(JsonElement root, ProviderRequestUsage previous) =>
+        ReadRequestUsage(root, previous);
+
+    internal static ProviderRequestUsage? ReadRequestUsage(JsonElement root, ProviderRequestUsage previous)
+    {
+        var usage = RequestUsageFields.Object(root, "usage");
+        if (usage.ValueKind == JsonValueKind.Undefined)
+        {
+            usage = RequestUsageFields.Object(RequestUsageFields.Object(root, "message"), "usage");
+        }
+        if (usage.ValueKind == JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        var uncached = AnthropicUsageTally.Largest(previous.UncachedInputTokens, RequestUsageFields.Count(usage, "input_tokens"));
+        var reads = AnthropicUsageTally.Largest(previous.CacheReadTokens, RequestUsageFields.Count(usage, "cache_read_input_tokens"));
+        var writes = AnthropicUsageTally.Largest(previous.CacheWriteTokens, RequestUsageFields.Count(usage, "cache_creation_input_tokens"));
+        var output = AnthropicUsageTally.Largest(previous.OutputTokens, RequestUsageFields.Count(usage, "output_tokens"));
+        return new ProviderRequestUsage(0, AnthropicUsageTally.InputTotal(uncached, writes, reads), output,
+            CacheReadTokens: reads, CacheWriteTokens: writes)
+        {
+            UncachedInputTokens = uncached,
+            CacheWritesByLifetime = RequestUsageFields.CacheWrites(RequestUsageFields.Object(usage, "cache_creation"),
+                ("ephemeral_5m_input_tokens", 5 * 60), ("ephemeral_1h_input_tokens", 60 * 60))
+        };
+    }
+
     private static TokenUsage? ReadUsage(JsonElement root)
     {
         if (!root.TryGetProperty("usage", out var usage))

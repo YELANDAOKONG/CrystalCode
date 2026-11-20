@@ -11,4 +11,13 @@ public sealed record ProviderUsageSummary(
     long? OutputTokens,
     long? ReasoningTokens,
     long? CacheReadTokens,
-    long? CacheWriteTokens);
+    long? CacheWriteTokens)
+{
+    public int RequestCount { get; init; }
+
+    public long? UncachedInputTokens { get; init; }
+
+    public ProviderUsageCoverage Coverage { get; init; } = new();
+
+    public IReadOnlyList<ProviderCacheWriteUsage> CacheWritesByLifetime { get; init; } = [];
+}

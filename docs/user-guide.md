@@ -1933,14 +1933,17 @@ that already exists. `/tokens` with no argument toggles the live
 progress-row estimate (four characters per token, prefixed with `~`).
 It is not provider-billed usage. The choice is written to `config.json`.
 
-`/status full` includes Responses request diagnostics when available. It
-shows HTTP attempts, calls that returned usage, and reported input, cache
-read, cache write, output, and reasoning tokens, grouped by provider, model,
-and main, child, or auxiliary work. Review and compaction are auxiliary
-work. For ChatGPT sign-in, HTTP attempts count inference sends. A token
-failure before the first send contributes zero. Missing counts display as
-`--`. The ChatGPT plan's five-hour and
-weekly limits are tracked by ChatGPT separately.
+`/status full` includes diagnostics for all built-in protocols and plugin
+providers that report them. It groups the last turn's HTTP attempts and
+reported use by provider, model, and main, child, or auxiliary work. Review
+and compaction are auxiliary work. Rows show input, uncached input, output,
+reasoning, cache reads, and cache writes, with a lifetime breakdown where
+the provider returns one. Missing counts display as `--`. A label such as
+`(1/3 requests)` means that field was supplied by one of three requests.
+Compare cache reads and input across the same set of requests when calculating
+a hit rate. For ChatGPT sign-in, a token failure before the first inference
+send contributes zero attempts. ChatGPT tracks its five-hour and weekly
+plan limits separately.
 
 `/statusline` does not replace `/status`. The status line is a configurable
 live summary, while `/status` remains a stable diagnostic report. Supported
