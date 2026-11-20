@@ -2557,7 +2557,9 @@ Across the six built-in protocols, text and multimodal calls use protocol
 usage fields. The transport retains previously reported fields when a
 later cumulative stream event omits them. Anthropic combines its separate
 input and cache counts when all three are known. DeepSeek's cache misses
-are uncached input.
+are uncached input. If Gemini omits the candidate token count, the
+diagnostic can derive output from a consistent request total by subtracting
+prompt and tool-use prompt tokens.
 Plugin factories receive the same optional request context through
 `PluginClientRequest`. The existing context accounting and session token
 totals use the Crystal usage contract.

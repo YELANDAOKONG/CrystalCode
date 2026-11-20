@@ -6,6 +6,7 @@ using Crystal;
 using Crystal.Chat;
 using Crystal.Reasoning;
 using Crystal.Tools;
+using CrystalCode.Plugins.Clients;
 using CrystalCode.Providers.Gemini;
 
 using Xunit;
@@ -150,6 +151,49 @@ public sealed class GeminiProviderTests
         Assert.Equal(10, usage.Usage.InputTokenCount);
         Assert.Equal(12, usage.Usage.OutputTokenCount);
         Assert.Equal(4, usage.Usage.ReasoningTokenCount);
+    }
+
+    [Theory]
+    [InlineData(112, null, 12L)]
+    [InlineData(119, 7, 12L)]
+    [InlineData(111, null, null)]
+    [InlineData(null, null, null)]
+    public async Task StreamAsync_DerivesOutputUsageWhenLengthLimitedToThoughts(
+        int? total, int? toolPrompt, long? expectedOutput)
+    {
+        var metadata = new Dictionary<string, int> { ["promptTokenCount"] = 100, ["thoughtsTokenCount"] = 12 };
+        if (total is { } tokenTotal)
+        {
+            metadata["totalTokenCount"] = tokenTotal;
+        }
+        if (toolPrompt is { } toolTokens)
+        {
+            metadata["toolUsePromptTokenCount"] = toolTokens;
+        }
+
+        var handler = new RecordingHandler(JsonResponse.CreateStream(
+            $$$"""
+            data: {"candidates":[{"index":0,"content":{"parts":[{"text":"thinking","thought":true}]}}]}
+
+            data: {"candidates":[{"index":0,"finishReason":"MAX_TOKENS"}],"usageMetadata":{{{JsonSerializer.Serialize(metadata)}}} }
+
+            """));
+        using var http = new HttpClient(handler);
+        var reports = new List<ProviderRequestUsage>();
+        using var provider = new GeminiProvider(new GeminiOptions("test-key", "gemini-test")
+        {
+            RequestContext = () => new("session", null, reports.Add)
+        }, http);
+        var events = new List<ChatStreamEvent>();
+
+        await foreach (var item in provider.StreamAsync(new ChatRequest([new ChatMessage(ChatRole.User, "hi")])))
+        {
+            events.Add(item);
+        }
+
+        Assert.Equal(FinishReason.Length, Assert.Single(events.OfType<ChatCandidateCompleted>()).FinishReason);
+        Assert.Equal(new ProviderRequestUsage(1, InputTokens: 100, OutputTokens: expectedOutput, ReasoningTokens: 12),
+            Assert.Single(reports));
     }
 
     [Fact]

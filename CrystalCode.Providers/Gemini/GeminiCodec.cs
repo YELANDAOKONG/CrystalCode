@@ -440,16 +440,37 @@ internal sealed class GeminiCodec : IProtocolCodec
             return null;
         }
 
+        var input = RequestUsageFields.Count(usage, "promptTokenCount");
         var thoughts = RequestUsageFields.Count(usage, "thoughtsTokenCount") ?? previous.ReasoningTokens;
-        // Gemini reports candidate tokens and thinking tokens separately.
-        var candidates = RequestUsageFields.Count(usage, "candidatesTokenCount")
-            ?? (previous.OutputTokens - (previous.ReasoningTokens ?? 0));
-        var output = candidates is { } count && count <= long.MaxValue - (thoughts ?? 0)
+        var candidates = RequestUsageFields.Count(usage, "candidatesTokenCount");
+        var output = candidates is null ? ReadOutputFromTotal(usage, input, thoughts) : null;
+        candidates ??= previous.OutputTokens - (previous.ReasoningTokens ?? 0);
+        output ??= candidates is { } count && count >= 0 && count <= long.MaxValue - (thoughts ?? 0)
             ? count + thoughts.GetValueOrDefault()
             : (long?)null;
         return new ProviderRequestUsage(
-            0, RequestUsageFields.Count(usage, "promptTokenCount"), output, thoughts,
+            0, input, output, thoughts,
             RequestUsageFields.Count(usage, "cachedContentTokenCount"));
+    }
+
+    private static long? ReadOutputFromTotal(JsonElement usage, long? input, long? thoughts)
+    {
+        if (input is not { } prompt || RequestUsageFields.Count(usage, "totalTokenCount") is not { } total
+            || total < prompt)
+        {
+            return null;
+        }
+
+        var toolInput = usage.TryGetProperty("toolUsePromptTokenCount", out _)
+            ? RequestUsageFields.Count(usage, "toolUsePromptTokenCount") : 0;
+        var remainder = total - prompt;
+        if (toolInput is not { } tools || tools > remainder)
+        {
+            return null;
+        }
+
+        var output = remainder - tools;
+        return output >= thoughts.GetValueOrDefault() ? output : null;
     }
 
     internal static TokenUsage? ReadUsage(JsonElement root)
