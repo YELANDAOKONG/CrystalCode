@@ -433,7 +433,8 @@ Crystal-aware client can tell sources apart. Child events also carry
 When `/status full` has provider request diagnostics, the status report
 includes them in its text. For clients that use `_crystal/report`, the
 structured `status.requestUsage` entries use the same fields as the HTTP
-server.
+server. The `/stats` report also includes prompt cache totals in its text
+and uses the HTTP server's cache fields in its structured report.
 | `CompactionStarted`, `CompactionFinished` | with `session.compaction`: `compaction_update` `in_progress`, then `compaction_summary_chunk` when a summary is shown, then `compaction_update` `completed`, `failed`, or `cancelled` (`unchanged` is sent as `completed` with `_meta.crystal.status`). Without it, a shown summary is `agent_message_chunk` whose `messageId` is the compaction id; engine notes follow the `NoteWritten` mapping above |
 | `TurnStarted`, `TurnFinished` | `_meta` on the first and last update; the prompt response |
 

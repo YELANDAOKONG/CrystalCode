@@ -889,6 +889,45 @@ public static class WireWriter
         writer.WriteNumber("totalTokens", report.TotalTokens);
         writer.WriteNumber("averageTokensPerSession", report.AverageTokensPerSession);
         writer.WriteNumber("medianTokensPerSession", report.MedianTokensPerSession);
+        writer.WriteNumber("cacheTrackedSessions", report.CacheTrackedSessions);
+        if (report.CacheUsage is { } cache)
+        {
+            writer.WriteStartObject("cacheUsage");
+            writer.WriteNumber("requestCount", cache.RequestCount);
+            WriteUsageCount(writer, "readTokens", cache.ReadTokens);
+            WriteUsageCount(writer, "writeTokens", cache.WriteTokens);
+            writer.WriteNumber("readReports", cache.ReadReports);
+            writer.WriteNumber("writeReports", cache.WriteReports);
+            writer.WriteNumber("comparableRequests", cache.ComparableRequests);
+            writer.WriteNumber("comparableInputTokens", cache.ComparableInputTokens);
+            writer.WriteNumber("comparableReadTokens", cache.ComparableReadTokens);
+            if (report.CacheReadRatePercent is { } rate)
+            {
+                writer.WriteNumber("readRatePercent", rate);
+            }
+            else
+            {
+                writer.WriteNull("readRatePercent");
+            }
+
+            if (cache.WritesByLifetime.Count > 0)
+            {
+                writer.WriteStartArray("writesByLifetime");
+                foreach (var writes in cache.WritesByLifetime)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteNumber("lifetimeSeconds", writes.LifetimeSeconds);
+                    writer.WriteNumber("tokens", writes.Tokens);
+                    writer.WriteNumber("reports", writes.Reports);
+                    writer.WriteEndObject();
+                }
+
+                writer.WriteEndArray();
+            }
+
+            writer.WriteEndObject();
+        }
+
         writer.WriteNumber("windowDays", report.WindowDays);
         Date(writer, "earliest", report.Earliest);
         Date(writer, "latest", report.Latest);

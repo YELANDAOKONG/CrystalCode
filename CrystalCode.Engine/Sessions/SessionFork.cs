@@ -32,6 +32,7 @@ internal static class SessionFork
             ToolCalls = Math.Max(0, source.ToolCalls),
             Usage = CloneUsage(source.Usage),
             CumulativeUsage = CloneUsage(source.CumulativeUsage),
+            // Historical cache totals belong to the session that sent the requests.
             Children = source.Children.Select(CloneChild).ToList()
         };
     }

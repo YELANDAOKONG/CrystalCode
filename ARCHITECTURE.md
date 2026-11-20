@@ -2568,6 +2568,20 @@ failed token lookup or refresh before the first send contributes zero. A
 JSON error body returned in place of an event stream still contributes
 the usage fields it supplies.
 
+`/stats` reads the cache totals saved with each session and groups them
+over the existing workspace and day scope. Each request contributes once
+to its turn's diagnostics and to its originating session's cache totals.
+This includes any reported child or auxiliary requests. A delayed report
+stays attached to the session that sent the request. Checkpoints and session
+saves retain these totals, and stats can use the live totals for its active
+saved session. Resuming restores the totals. A fork accumulates its own
+requests, while the source retains the cache usage from inherited history.
+Old session files without cache data have unknown cache usage. The cache
+read rate divides read tokens by input tokens on the same requests with
+valid counts. Per-field coverage counts and the number of tracked sessions
+describe the scope. Cache totals are a separate breakdown of the requests'
+input tokens.
+
 Operator plugins live under `plugins/`. A project directory of the same
 name replaces the home plugin as a whole. `plugin.json` field `enabled`
 (default `true`) omits a plugin without deleting it. `config.json` field

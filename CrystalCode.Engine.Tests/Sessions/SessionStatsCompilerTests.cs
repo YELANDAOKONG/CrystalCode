@@ -1,5 +1,12 @@
+using System.Collections.Immutable;
+
+using Crystal;
+using Crystal.Chat;
+
 using CrystalCode.Engine.Home;
+using CrystalCode.Engine.Events;
 using CrystalCode.Engine.Sessions;
+using CrystalCode.Plugins.Clients;
 
 using Xunit;
 
@@ -7,6 +14,88 @@ namespace CrystalCode.Engine.Tests.Sessions;
 
 public sealed class SessionStatsCompilerTests
 {
+    [Fact]
+    public async Task Stats_PreservesCacheUsageOnResumeAndCountsForkRequestsOnce()
+    {
+        ChatStreamEvent[] reply =
+        [
+            new ChatTextDelta(0, 0, ChatRole.Assistant, "done"),
+            new ChatCandidateCompleted(0, FinishReason.Stop)
+        ];
+        var requests = new Queue<ProviderRequestUsage>(
+        [
+            new ProviderRequestUsage(1, InputTokens: 100, CacheReadTokens: 60, CacheWriteTokens: 5)
+            {
+                CacheWritesByLifetime = ImmutableDictionary<int, long>.Empty.Add(300, 5)
+            },
+            new ProviderRequestUsage(1, InputTokens: 200, CacheWriteTokens: 0),
+            new ProviderRequestUsage(1, InputTokens: 100, CacheReadTokens: 0),
+            new ProviderRequestUsage(1, InputTokens: 50, CacheReadTokens: 25)
+        ]);
+        void Report(ProviderRequestContext context) => context.ReportUsage(requests.Dequeue());
+
+        using var original = new HeadlessSession(new ScriptedStreamingClient(reply, reply), observeRequest: Report);
+        await original.Session.StartAsync(CancellationToken.None);
+        await original.RunTurnAsync("first");
+        await original.RunTurnAsync("second");
+        var stored = original.ReadSaved();
+        Assert.Equal(2, stored.CacheUsage!.RequestCount);
+        Assert.Equal(60, stored.CacheUsage.ReadTokens);
+
+        using var resumed = new HeadlessSession(new ScriptedStreamingClient(reply, reply), stored, observeRequest: Report);
+        await resumed.Session.StartAsync(CancellationToken.None);
+        await resumed.RunTurnAsync("resume");
+        Assert.Equal(3, resumed.ReadSaved().CacheUsage!.RequestCount);
+        await resumed.Session.SubmitAsync("/fork", CancellationToken.None);
+        Assert.Null(resumed.ReadSaved().CacheUsage);
+        await resumed.RunTurnAsync("branch");
+        Assert.Equal(25, resumed.ReadSaved().CacheUsage!.ReadTokens);
+
+        await resumed.Session.SubmitAsync("/stats", CancellationToken.None);
+        var report = Assert.Single(resumed.Observer.Events.OfType<StatsReported>()).Report;
+        var cache = Assert.IsType<SessionCacheUsage>(report.CacheUsage);
+        Assert.Equal(2, report.CacheTrackedSessions);
+        Assert.Equal(4, cache.RequestCount);
+        Assert.Equal(85, cache.ReadTokens);
+        Assert.Equal(5, cache.WriteTokens);
+        Assert.Equal(3, cache.ReadReports);
+        Assert.Equal(2, cache.WriteReports);
+        Assert.Equal(250, cache.ComparableInputTokens);
+        Assert.Equal(34m, report.CacheReadRatePercent);
+        Assert.Equal(new ProviderCacheWriteUsage(300, 5, 1), Assert.Single(cache.WritesByLifetime));
+    }
+
+    [Fact]
+    public void Compile_KeepsLegacyCacheUsageUnknownAndAppliesTheDayWindow()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var legacy = new SessionDocument { UpdatedUtc = now };
+        var outsideWindow = new SessionDocument
+        {
+            UpdatedUtc = now.AddDays(-8),
+            CacheUsage = new SessionCacheUsage { RequestCount = 1, ReadReports = 1, ReadTokens = 900 }
+        };
+        var report = SessionStatsCompiler.Compile([legacy, outsideWindow], now, windowDays: 7, topTools: 5);
+
+        Assert.Equal(1, report.Sessions);
+        Assert.Equal(0, report.CacheTrackedSessions);
+        Assert.Null(report.CacheUsage);
+        Assert.Null(report.CacheReadRatePercent);
+        Assert.Contains(("Cache reads", "--"), StatsText.CacheRows(report));
+    }
+
+    [Fact]
+    public void NextTurn_TracksLateUsageInTheOriginalTurnAndSession()
+    {
+        var original = new ProviderUsageLedger("session");
+        var next = original.NextTurn();
+        original.Record("Auxiliary", "provider", "model", new ProviderRequestUsage(1, CacheReadTokens: 0));
+
+        Assert.Empty(next.Snapshot());
+        Assert.Equal(0, Assert.Single(original.Snapshot()).CacheReadTokens);
+        Assert.Equal(0, next.CacheSnapshot()!.ReadTokens);
+    }
+
     [Fact]
     public void Compile_AggregatesTokensAndTopTools()
     {

@@ -452,6 +452,13 @@ and `uncachedInputTokens`. The `coverage` object gives each token field's
 report count. Optional `cacheWritesByLifetime` entries carry
 `lifetimeSeconds`, `tokens`, and `reports`.
 
+`report.stats` includes `report.cacheTrackedSessions` and an optional
+`report.cacheUsage`. When present, the cache summary carries `requestCount`,
+nullable `readTokens` and `writeTokens`, `readReports`, `writeReports`,
+`comparableRequests`, `comparableInputTokens`, `comparableReadTokens`, and
+nullable `readRatePercent`. Optional `writesByLifetime` entries carry
+`lifetimeSeconds`, `tokens`, and `reports`.
+
 The chrome object in `session.started`, `chrome.changed`, and the snapshot
 names the active `provider` and `model` along with the `sessionId`, workspace, mode, approval,
 thinking, prompt set, context window, service tier, and speed. Its `pending`

@@ -2,12 +2,28 @@ using CrystalCode.Plugins.Clients;
 
 namespace CrystalCode.Engine.Sessions;
 
-internal sealed class ProviderUsageLedger(string sessionId)
+internal sealed class ProviderUsageLedger
 {
     private readonly object _gate = new();
     private readonly Dictionary<(string Scope, string Provider, string Model), ProviderUsageSummary> _summaries = [];
+    private readonly SessionCacheUsageLedger _sessionCache;
 
-    public string SessionId { get; } = sessionId;
+    public ProviderUsageLedger(string sessionId, SessionCacheUsage? cacheUsage = null)
+        : this(sessionId, new SessionCacheUsageLedger(cacheUsage))
+    {
+    }
+
+    private ProviderUsageLedger(string sessionId, SessionCacheUsageLedger sessionCache)
+    {
+        SessionId = sessionId;
+        _sessionCache = sessionCache;
+    }
+
+    public string SessionId { get; }
+
+    public ProviderUsageLedger NextTurn() => new(SessionId, _sessionCache);
+
+    public SessionCacheUsage? CacheSnapshot() => _sessionCache.Snapshot();
 
     public void Record(string scope, string provider, string model, ProviderRequestUsage usage)
     {
@@ -43,6 +59,7 @@ internal sealed class ProviderUsageLedger(string sessionId)
                     coverage.UncachedInputTokens + Reported(usage.UncachedInputTokens)),
                 CacheWritesByLifetime = AddCacheWrites(previous.CacheWritesByLifetime, usage)
             };
+            _sessionCache.Record(usage);
         }
     }
 
@@ -71,14 +88,7 @@ internal sealed class ProviderUsageLedger(string sessionId)
             return previous;
         }
 
-        var totals = previous.ToDictionary(value => value.LifetimeSeconds);
-        foreach (var (lifetime, tokens) in reported)
-        {
-            totals.TryGetValue(lifetime, out var total);
-            totals[lifetime] = new ProviderCacheWriteUsage(
-                lifetime, (total?.Tokens ?? 0) + tokens, (total?.Reports ?? 0) + 1);
-        }
-
-        return Array.AsReadOnly(totals.Values.OrderBy(value => value.LifetimeSeconds).ToArray());
+        return ProviderCacheWriteUsage.Add(previous,
+            reported.Select(value => new ProviderCacheWriteUsage(value.Key, value.Value, 1)).ToArray());
     }
 }

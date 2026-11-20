@@ -31,6 +31,8 @@ internal static class StatsPageWidget
                 Text.Empty,
                 Section("Tokens", Fields(TokenRows(report))),
                 Text.Empty,
+                Section("Prompt cache", Fields(StatsText.CacheRows(report))),
+                Text.Empty,
                 Section("Tools", ToolBody(report)),
                 Text.Empty,
                 new Markup($"[{Theme.Muted}]Esc or q to close[/]")),

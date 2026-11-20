@@ -1,3 +1,4 @@
+using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
 
 namespace CrystalCode.Engine.Home;
@@ -54,6 +55,9 @@ public sealed class SessionDocument
     public SessionUsageDocument? Usage { get; set; }
 
     public SessionUsageDocument? CumulativeUsage { get; set; }
+
+    /// <summary>Cache usage reported by requests sent from this session.</summary>
+    public SessionCacheUsage? CacheUsage { get; set; }
 
     /// <summary>
     /// Short session name. Null means none yet; an older session has none and

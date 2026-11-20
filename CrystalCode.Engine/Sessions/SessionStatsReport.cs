@@ -17,4 +17,13 @@ public sealed record SessionStatsReport(
     int WindowDays,
     DateTimeOffset? Earliest,
     DateTimeOffset? Latest,
-    IReadOnlyList<SessionToolCount> TopTools);
+    IReadOnlyList<SessionToolCount> TopTools)
+{
+    public int CacheTrackedSessions { get; init; }
+
+    public SessionCacheUsage? CacheUsage { get; init; }
+
+    public decimal? CacheReadRatePercent => CacheUsage is { ComparableInputTokens: > 0 } cache
+        ? 100m * cache.ComparableReadTokens / cache.ComparableInputTokens
+        : null;
+}

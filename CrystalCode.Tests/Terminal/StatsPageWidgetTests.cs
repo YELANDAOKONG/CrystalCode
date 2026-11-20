@@ -25,7 +25,19 @@ public sealed class StatsPageWidgetTests
             7,
             new DateTimeOffset(2026, 10, 1, 8, 0, 0, TimeSpan.Zero),
             new DateTimeOffset(2026, 10, 4, 8, 0, 0, TimeSpan.Zero),
-            [new SessionToolCount("read", 6), new SessionToolCount("bash", 4)]);
+            [new SessionToolCount("read", 6), new SessionToolCount("bash", 4)])
+        {
+            CacheTrackedSessions = 1,
+            CacheUsage = new SessionCacheUsage
+            {
+                RequestCount = 3,
+                ReadTokens = 40,
+                ReadReports = 1,
+                ComparableRequests = 1,
+                ComparableInputTokens = 100,
+                ComparableReadTokens = 40
+            }
+        };
 
         var lines = WidgetPaint.Plain(StatsPageWidget.Create(report, allWorkspaces: false), 80);
         var text = string.Join('\n', lines);
@@ -33,6 +45,11 @@ public sealed class StatsPageWidgetTests
         Assert.Contains("This workspace", text, StringComparison.Ordinal);
         Assert.Contains("Overview", text, StringComparison.Ordinal);
         Assert.Contains("Tokens", text, StringComparison.Ordinal);
+        Assert.Contains("Prompt cache", text, StringComparison.Ordinal);
+        Assert.Contains(lines, static line => line.Contains("Cache read rate", StringComparison.Ordinal)
+            && line.Contains("40.0% (1/3 requests)", StringComparison.Ordinal));
+        Assert.Contains(lines, static line => line.Contains("Cache writes", StringComparison.Ordinal)
+            && line.Contains("--", StringComparison.Ordinal));
         Assert.Contains("Tools", text, StringComparison.Ordinal);
         Assert.Contains("1,560", text, StringComparison.Ordinal);
         Assert.Contains(lines, static line =>

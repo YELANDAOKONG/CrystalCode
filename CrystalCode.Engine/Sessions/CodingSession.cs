@@ -7364,6 +7364,7 @@ public sealed class CodingSession : ITurnObserver
                 ? _parentTurnUsage is not null && (_ledger.ModelCalls == 0 || _ledger.CumulativeUsage is not null)
                     ? SessionLedger.Add(_ledger.CumulativeUsage, _parentTurnUsage) : null
                 : _ledger.CumulativeUsage),
+            CacheUsage = Volatile.Read(ref _providerUsage).CacheSnapshot(),
             Children = _children.Snapshot().ToList(),
             Topic = CurrentTopic(),
             TopicSource = TopicSourceText(),
@@ -7760,12 +7761,18 @@ public sealed class CodingSession : ITurnObserver
             return;
         }
 
+        var currentUsage = Volatile.Read(ref _providerUsage);
         var summaries = _sessionStore.List(options.IncludeAllWorkspaces ? null : _workspace.Root);
         var sessions = new List<SessionDocument>(summaries.Count);
         foreach (var summary in summaries)
         {
             if (_sessionStore.TryLoad(summary.Id, out var document))
             {
+                if (summary.Id == currentUsage.SessionId)
+                {
+                    document.CacheUsage = currentUsage.CacheSnapshot();
+                }
+
                 sessions.Add(document);
             }
         }
@@ -7800,7 +7807,7 @@ public sealed class CodingSession : ITurnObserver
         _settings = _settings.WithSessionDisabledBuiltInTools(
             SessionMapper.ReadDisabledBuiltInTools(document.DisabledBuiltInTools));
         _sessionId = document.Id!;
-        Volatile.Write(ref _providerUsage, new ProviderUsageLedger(_sessionId));
+        Volatile.Write(ref _providerUsage, new ProviderUsageLedger(_sessionId, document.CacheUsage));
         _sessionCreatedUtc = document.CreatedUtc ?? DateTimeOffset.UtcNow;
         ResetTopic(
             SessionTopic.Normalize(document.Topic),
@@ -11392,7 +11399,7 @@ public sealed class CodingSession : ITurnObserver
         var turnSource = new CancellationTokenSource();
         _turnSource = turnSource;
         _turnActive = true;
-        Volatile.Write(ref _providerUsage, new ProviderUsageLedger(_sessionId));
+        Volatile.Write(ref _providerUsage, Volatile.Read(ref _providerUsage).NextTurn());
         lock (_usageGate)
         {
             _turnCumulativeBaseline = _shownCumulative;

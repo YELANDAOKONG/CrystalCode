@@ -34,6 +34,8 @@ internal static class SessionStatsCompiler
         var input = 0L;
         var output = 0L;
         var reasoning = 0L;
+        var cacheTrackedSessions = 0;
+        SessionCacheUsage? cacheUsage = null;
         var userTurns = 0;
         var modelCalls = 0;
         var toolCalls = 0;
@@ -63,6 +65,11 @@ internal static class SessionStatsCompiler
             output += sessionOutput;
             reasoning += sessionReasoning;
             totals.Add(sessionInput + sessionOutput + sessionReasoning);
+            if (session.CacheUsage is { RequestCount: > 0 } cache)
+            {
+                cacheTrackedSessions++;
+                cacheUsage = cacheUsage is null ? cache : cacheUsage.Add(cache);
+            }
 
             var timestamp = session.UpdatedUtc ?? session.CreatedUtc;
             if (timestamp is null)
@@ -108,6 +115,10 @@ internal static class SessionStatsCompiler
             rangeDays,
             earliest,
             latest,
-            top);
+            top)
+        {
+            CacheTrackedSessions = cacheTrackedSessions,
+            CacheUsage = cacheUsage
+        };
     }
 }

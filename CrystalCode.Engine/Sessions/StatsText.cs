@@ -28,6 +28,8 @@ public static class StatsText
             Row("Average per session", Count(report.AverageTokensPerSession)),
             Row("Median per session", Count(report.MedianTokensPerSession))
         };
+        lines.Add("Prompt cache");
+        lines.AddRange(CacheRows(report).Select(static row => Row(row.Label, row.Value)));
         if (report.TopTools.Count == 0)
         {
             lines.Add("No tool calls.");
@@ -41,9 +43,38 @@ public static class StatsText
         return string.Join(Environment.NewLine, lines);
     }
 
+    public static IReadOnlyList<(string Label, string Value)> CacheRows(SessionStatsReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        var usage = report.CacheUsage;
+        var requests = usage?.RequestCount ?? 0;
+        var rate = report.CacheReadRatePercent is { } percent
+            ? percent.ToString("0.0", CultureInfo.InvariantCulture) + "%"
+            : "--";
+        var rows = new List<(string Label, string Value)>
+        {
+            ("Tracked sessions", $"{Count(report.CacheTrackedSessions)} / {Count(report.Sessions)}"),
+            ("Cache reads", Covered(Count(usage?.ReadTokens), usage?.ReadReports ?? 0, requests)),
+            ("Cache writes", Covered(Count(usage?.WriteTokens), usage?.WriteReports ?? 0, requests)),
+            ("Cache read rate", Covered(rate, usage?.ComparableRequests ?? 0, requests))
+        };
+        foreach (var writes in usage?.WritesByLifetime ?? [])
+        {
+            rows.Add(($"  {Count(writes.LifetimeSeconds)} s lifetime",
+                Covered(Count(writes.Tokens), writes.Reports, requests)));
+        }
+
+        return rows.AsReadOnly();
+    }
+
+    private static string Covered(string value, long reports, long requests) =>
+        reports > 0 && reports < requests ? $"{value} ({Count(reports)}/{Count(requests)} requests)" : value;
+
     private static string Row(string label, string value) => $"  {label,-22}{value}";
 
     private static string Count(long value) => value.ToString("N0", CultureInfo.InvariantCulture);
+
+    private static string Count(long? value) => value is { } count ? Count(count) : "--";
 
     private static string When(DateTimeOffset? value) =>
         value is { } time ? time.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) : "--";

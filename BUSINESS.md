@@ -464,6 +464,9 @@ separate library with no terminal code. The product can:
 - show provider request attempts and reported cache tokens for built-in providers and
   participating plugin providers in the detailed status report, with
   coverage for each reported metric;
+- show saved cache reads, writes, optional write lifetimes, and a
+  token-weighted cache read rate in `/stats`. The rate uses the requests
+  that report both a valid input total and a cache read count;
 - sign in to a provider with an account instead of an API key. A provider
   definition with `type` `authentication` names an authentication integration
   and lists its own models. `crystal login <provider>` and `/login` run the
@@ -1069,14 +1072,9 @@ question. No change is scheduled, and a later decision may revisit it. Such a
 decision must define which limits may vary, at which scope, and how a larger
 limit interacts with context compaction.
 
-More detailed token and model usage statistics are under consideration and
-are not decided. `/stats` currently aggregates session totals without a
-per-model or call-purpose breakdown, and not every side-model call contributes
-usage. Which model calls belong in the totals, how missing provider-reported
-usage is represented, which breakdowns are useful, and how reports work across
-the terminal, Server, and Bridge are not defined. No change is scheduled, and
-a later decision may revisit it. Do not reserve a configuration field, public
-type, event, or wire field.
+Further token and model usage breakdowns are under consideration. The
+historical cache summary and existing session totals aggregate across models
+and call purposes. Per-model and call-purpose statistics are undecided.
 
 Deferred questions are under consideration and are not decided. The idea is
 that the model can ask a low-stakes question without stopping, continue on a

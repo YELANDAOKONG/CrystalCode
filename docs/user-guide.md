@@ -1892,7 +1892,7 @@ Submitting returns the transcript viewport to the latest output.
 | `/promptset` | `/prompts` | List prompt sets and effective sources, enable one set, or `/prompts export [dir]` |
 | `/promptattach` | | List prompt attachments, or `enable` / `disable` / `up` / `down` one name |
 | `/status` | | Cumulative tokens and context progress with workspace, model, and options; `full` adds diagnostics |
-| `/stats` | | Replaces the session frame with Overview, Tokens, and Tools panels, including a tool share bar. Supports `all`, `<Nd>`, and `tools <count>`. Esc or `q` restores the session |
+| `/stats` | | Replaces the session frame with Overview, Tokens, Prompt cache, and Tools panels, including a tool share bar. Supports `all`, `<Nd>`, and `tools <count>`. Esc or `q` restores the session |
 | `/btw` | `/side` | Asks a side question from the committed transcript. The answer stays in a panel above the composer and is not saved. An answer taller than the panel scrolls inside it with the wheel, PageUp, PageDown, or Ctrl+Up/Down, and the title and border stay visible. While the model has not started, the panel shows the same spinner as the progress row. Once reasoning starts, the caption changes to Thinking until answer text arrives. An empty `/btw` reopens it. Esc, Enter, Space, or Ctrl+C closes it. Ctrl+C also cancels a side question that is still running and leaves the main turn running. Left and Right step through earlier answers. `x` clears them |
 | `/statusline` | | Show custom status-line state; use `on`, `off`, `reset`, or an ordered field list |
 | `/clear` | `/new` | Start a new conversation (new session id) |
@@ -1944,6 +1944,14 @@ Compare cache reads and input across the same set of requests when calculating
 a hit rate. For ChatGPT sign-in, a token failure before the first inference
 send contributes zero attempts. ChatGPT tracks its five-hour and weekly
 plan limits separately.
+
+The `/stats` Prompt cache panel totals saved cache reads, writes, and
+reported write lifetimes across the selected sessions. The cache read
+percentage uses the input and read tokens from the same requests. Tracked
+sessions and per-field request counts show how much data was available.
+Older sessions without recorded cache usage remain unknown. Resume keeps
+recorded usage, and a fork starts a separate tally for requests sent after
+forking.
 
 `/statusline` does not replace `/status`. The status line is a configurable
 live summary, while `/status` remains a stable diagnostic report. Supported
