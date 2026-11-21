@@ -7805,12 +7805,14 @@ public sealed class CodingSession : ITurnObserver
         var currentUsage = Volatile.Read(ref _providerUsage);
         var summaries = _sessionStore.List(options.IncludeAllWorkspaces ? null : _workspace.Root);
         var sessions = new List<SessionDocument>(summaries.Count);
+        var currentListed = false;
         foreach (var summary in summaries)
         {
             if (_sessionStore.TryLoad(summary.Id, out var document))
             {
                 if (summary.Id == currentUsage.SessionId)
                 {
+                    currentListed = true;
                     var cache = currentUsage.CacheSnapshot();
                     document.CacheUsage = cache.Usage;
                     document.CacheUsageSamples = cache.Samples;
@@ -7818,6 +7820,12 @@ public sealed class CodingSession : ITurnObserver
 
                 sessions.Add(document);
             }
+        }
+
+        // A session not yet checkpointed has no stored document but may already have cache usage.
+        if (!currentListed && currentUsage.CacheSnapshot().Usage is not null)
+        {
+            sessions.Add(CreateDocument());
         }
 
         var report = SessionStatsCompiler.Compile(

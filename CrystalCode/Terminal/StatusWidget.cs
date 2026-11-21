@@ -142,7 +142,14 @@ internal static class StatusWidget
                     ("Output", TokenValue(status.Usage?.OutputTokenCount)),
                     ("Total", TokenValue(status.Usage?.TotalTokenCount))
                 ]));
-            foreach (var usage in status.RequestUsage ?? [])
+            var requestUsage = status.RequestUsage ?? [];
+            if (requestUsage.Count == 0)
+            {
+                blocks.Add(SectionRule("Provider requests"));
+                blocks.Add(FieldGrid([("This turn", "None reported yet")]));
+            }
+
+            foreach (var usage in requestUsage)
             {
                 blocks.Add(SectionRule($"{usage.Scope} requests ({usage.Provider} / {usage.Model})"));
                 blocks.Add(FieldGrid(StatusText.RequestUsageRows(usage)));

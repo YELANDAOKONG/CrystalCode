@@ -2578,7 +2578,12 @@ totals and samples for the active saved session. Resuming restores the totals
 and a fork collects usage for its own requests. Previously saved cache totals
 without samples contribute to the unfiltered report. A day window uses
 request start times in the selected workspace scope. The read rate divides
-read tokens by input tokens on the same requests with valid counts.
+read tokens by input tokens on the same requests with valid counts. The cache
+section also lists the request count, miss tokens, and the miss rate that
+complements the read rate. An active session that has cache usage but no saved
+document yet is still included. `/status full` shows a request cache read rate
+when every request reported both input and cache reads, and shows
+"None reported yet" until the turn's first request reports.
 
 The Overview, Tokens, and Tools sections retain the existing session date
 filter. The token section uses known session totals, including a saved

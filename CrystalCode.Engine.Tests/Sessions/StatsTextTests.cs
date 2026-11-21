@@ -37,4 +37,30 @@ public sealed class StatsTextTests
         Assert.Contains(("Request window (days)", "7"), rows);
         Assert.Contains(("Tracked sessions", "2"), rows);
     }
+
+    [Fact]
+    public void CacheRows_ShowRequestsMissesAndMissRate()
+    {
+        var report = new SessionStatsReport(1, 1, 1, 0, null, null, null, null, null, null, 7, null, null, [])
+        {
+            CacheTrackedSessions = 1,
+            CacheUsage = new SessionCacheUsage
+            {
+                RequestCount = 2,
+                ReadReports = 2,
+                ReadTokens = 60,
+                MissReports = 2,
+                MissTokens = 40,
+                ComparableRequests = 2,
+                ComparableInputTokens = 100,
+                ComparableReadTokens = 60
+            }
+        };
+
+        var rows = StatsText.CacheRows(report);
+
+        Assert.Contains(("Requests", "2"), rows);
+        Assert.Contains(("Cache misses", "40"), rows);
+        Assert.Contains(("Cache miss rate", "40.0%"), rows);
+    }
 }

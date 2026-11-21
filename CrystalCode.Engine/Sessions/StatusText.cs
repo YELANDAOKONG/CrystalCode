@@ -139,7 +139,13 @@ public static class StatusText
                     ("Output tokens", TokenValue(status.Usage?.OutputTokenCount)),
                     ("Total tokens", TokenValue(status.Usage?.TotalTokenCount))
                 ]);
-            foreach (var usage in status.RequestUsage ?? [])
+            var requestUsage = status.RequestUsage ?? [];
+            if (requestUsage.Count == 0)
+            {
+                AddSection(lines, "Provider requests", [("This turn", "None reported yet")]);
+            }
+
+            foreach (var usage in requestUsage)
             {
                 AddSection(
                     lines,
@@ -195,9 +201,22 @@ public static class StatusText
             rows.Add(($"  {Number(writes.LifetimeSeconds)} s lifetime", ReportedTokens(writes.Tokens, writes.Reports, requests)));
         }
 
+        if (usage.InputTokens is > 0 && usage.CacheReadTokens is { } read && read <= usage.InputTokens
+            && coverage.InputTokens == coverage.CacheReadTokens)
+        {
+            var rate = 100m * read / usage.InputTokens.Value;
+            rows.Add(("Cache read rate", ReportedRate(rate, coverage.InputTokens, requests)));
+        }
+
         rows.Add(("Output", ReportedTokens(usage.OutputTokens, coverage.OutputTokens, requests)));
         rows.Add(("Reasoning", ReportedTokens(usage.ReasoningTokens, coverage.ReasoningTokens, requests)));
         return rows.AsReadOnly();
+    }
+
+    private static string ReportedRate(decimal percent, int reports, int requests)
+    {
+        var text = percent.ToString("0.0", CultureInfo.InvariantCulture) + "%";
+        return reports < requests ? $"{text} ({Number(reports)}/{Number(requests)} requests)" : text;
     }
 
     private static string ReportedTokens(long? value, int reports, int requests) =>

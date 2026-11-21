@@ -69,9 +69,8 @@ public static class StatsText
         ArgumentNullException.ThrowIfNull(report);
         var usage = report.CacheUsage;
         var requests = usage?.RequestCount ?? 0;
-        var rate = report.CacheReadRatePercent is { } percent
-            ? percent.ToString("0.0", CultureInfo.InvariantCulture) + "%"
-            : "--";
+        var rate = Percent(report.CacheReadRatePercent);
+        var missRate = Percent(usage?.GetMissRatePercent());
         var rows = new List<(string Label, string Value)>();
         if (report.CacheWindowDays is { } days)
         {
@@ -85,9 +84,12 @@ public static class StatsText
 
         rows.AddRange(
         [
+            ("Requests", Count(requests)),
             ("Cache reads", Covered(Count(usage?.ReadTokens), usage?.ReadReports ?? 0, requests)),
             ("Cache writes", Covered(Count(usage?.WriteTokens), usage?.WriteReports ?? 0, requests)),
-            ("Cache read rate", Covered(rate, usage?.ComparableRequests ?? 0, requests))
+            ("Cache misses", Covered(Count(usage?.GetMissTokens()), usage?.MissReports ?? 0, requests)),
+            ("Cache read rate", Covered(rate, usage?.ComparableRequests ?? 0, requests)),
+            ("Cache miss rate", Covered(missRate, usage?.ComparableRequests ?? 0, requests))
         ]);
         foreach (var writes in usage?.WritesByLifetime ?? [])
         {
@@ -97,6 +99,9 @@ public static class StatsText
 
         return rows.AsReadOnly();
     }
+
+    private static string Percent(decimal? value) =>
+        value is { } percent ? percent.ToString("0.0", CultureInfo.InvariantCulture) + "%" : "--";
 
     private static string Covered(string value, long reports, long requests) =>
         reports > 0 && reports < requests ? $"{value} ({Count(reports)}/{Count(requests)} requests)" : value;
