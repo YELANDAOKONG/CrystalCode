@@ -63,4 +63,7 @@ public sealed record SessionStatus(
     SessionPendingSettings? Pending = null)
 {
     public IReadOnlyList<ProviderUsageSummary>? RequestUsage { get; init; }
+
+    /// <summary>Cache totals for the whole session across turns. Set for <c>/status full</c>.</summary>
+    public SessionCacheUsage? CacheUsage { get; init; }
 }

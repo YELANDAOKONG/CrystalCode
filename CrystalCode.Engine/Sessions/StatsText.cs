@@ -67,10 +67,6 @@ public static class StatsText
     public static IReadOnlyList<(string Label, string Value)> CacheRows(SessionStatsReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
-        var usage = report.CacheUsage;
-        var requests = usage?.RequestCount ?? 0;
-        var rate = Percent(report.CacheReadRatePercent);
-        var missRate = Percent(usage?.GetMissRatePercent());
         var rows = new List<(string Label, string Value)>();
         if (report.CacheWindowDays is { } days)
         {
@@ -82,19 +78,39 @@ public static class StatsText
             rows.Add(("Tracked sessions", $"{Count(report.CacheTrackedSessions)} / {Count(report.Sessions)}"));
         }
 
-        rows.AddRange(
-        [
+        rows.AddRange(UsageRows(report.CacheUsage));
+        return rows.AsReadOnly();
+    }
+
+    /// <summary>Cache totals, then a per-scope split when any request came from a child or auxiliary call.</summary>
+    public static IReadOnlyList<(string Label, string Value)> UsageRows(SessionCacheUsage? usage)
+    {
+        var requests = usage?.RequestCount ?? 0;
+        var rate = Percent(usage?.GetReadRatePercent());
+        var missRate = Percent(usage?.GetMissRatePercent());
+        var rows = new List<(string Label, string Value)>
+        {
             ("Requests", Count(requests)),
             ("Cache reads", Covered(Count(usage?.ReadTokens), usage?.ReadReports ?? 0, requests)),
             ("Cache writes", Covered(Count(usage?.WriteTokens), usage?.WriteReports ?? 0, requests)),
             ("Cache misses", Covered(Count(usage?.GetMissTokens()), usage?.MissReports ?? 0, requests)),
             ("Cache read rate", Covered(rate, usage?.ComparableRequests ?? 0, requests)),
             ("Cache miss rate", Covered(missRate, usage?.ComparableRequests ?? 0, requests))
-        ]);
+        };
         foreach (var writes in usage?.WritesByLifetime ?? [])
         {
             rows.Add(($"  {Count(writes.LifetimeSeconds)} s lifetime",
                 Covered(Count(writes.Tokens), writes.Reports, requests)));
+        }
+
+        if (usage is { ByScope: { Count: > 0 } scopes } && scopes.Any(static scope => scope.Scope != "Main"))
+        {
+            rows.Add(("By scope", string.Empty));
+            foreach (var scope in scopes)
+            {
+                rows.Add(($"  {scope.Scope}",
+                    $"{Count(scope.Usage.RequestCount)} req, {Percent(scope.Usage.GetReadRatePercent())} read"));
+            }
         }
 
         return rows.AsReadOnly();

@@ -493,6 +493,11 @@ internal static class CrystalWire
         writer.WriteString("speed", status.Speed);
         Usage(writer, "usage", status.Usage);
         Usage(writer, "cumulativeUsage", status.CumulativeUsage);
+        if (status.CacheUsage is { } sessionCache)
+        {
+            CacheUsage(writer, "cacheUsage", sessionCache);
+        }
+
         if (status.RequestUsage is { Count: > 0 } requestUsage)
         {
             writer.WriteStartArray("requestUsage");
@@ -922,6 +927,26 @@ internal static class CrystalWire
         }
 
         writer.WriteStartObject(name);
+        CacheFields(writer, cache);
+        if (cache.ByScope.Count > 0)
+        {
+            writer.WriteStartArray("byScope");
+            foreach (var scope in cache.ByScope)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("scope", scope.Scope);
+                CacheFields(writer, scope.Usage);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+        }
+
+        writer.WriteEndObject();
+    }
+
+    private static void CacheFields(Utf8JsonWriter writer, SessionCacheUsage cache)
+    {
         writer.WriteNumber("requestCount", cache.RequestCount);
         WriteUsageCount(writer, "inputTokens", cache.InputTokens);
         WriteUsageCount(writer, "missTokens", cache.MissTokens);
@@ -957,8 +982,6 @@ internal static class CrystalWire
 
             writer.WriteEndArray();
         }
-
-        writer.WriteEndObject();
     }
 
     private static void WriteUsageCount(Utf8JsonWriter writer, string name, long? count)

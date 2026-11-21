@@ -139,6 +139,7 @@ public static class StatusText
                     ("Output tokens", TokenValue(status.Usage?.OutputTokenCount)),
                     ("Total tokens", TokenValue(status.Usage?.TotalTokenCount))
                 ]);
+            AddSection(lines, "Session cache", StatsText.UsageRows(status.CacheUsage));
             var requestUsage = status.RequestUsage ?? [];
             if (requestUsage.Count == 0)
             {

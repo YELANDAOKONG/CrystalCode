@@ -6127,7 +6127,8 @@ public sealed class CodingSession : ITurnObserver
                 Mode: _customMode,
                 Pending: CurrentPending())
             {
-                RequestUsage = full ? Volatile.Read(ref _providerUsage).Snapshot() : null
+                RequestUsage = full ? Volatile.Read(ref _providerUsage).Snapshot() : null,
+                CacheUsage = full ? Volatile.Read(ref _providerUsage).CacheSnapshot().Usage : null
             },
             full));
     }

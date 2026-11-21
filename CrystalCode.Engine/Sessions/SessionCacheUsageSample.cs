@@ -7,4 +7,5 @@ public sealed record SessionCacheUsageSample(
     long? ReadTokens,
     long? WriteTokens,
     IReadOnlyList<ProviderCacheWriteUsage>? WritesByLifetime,
-    long? UncachedInputTokens = null);
+    long? UncachedInputTokens = null,
+    string? Scope = null);

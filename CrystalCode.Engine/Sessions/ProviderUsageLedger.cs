@@ -72,7 +72,8 @@ internal sealed class ProviderUsageLedger
                 usage.CacheReadTokens,
                 usage.CacheWriteTokens,
                 writes,
-                usage.UncachedInputTokens));
+                usage.UncachedInputTokens,
+                scope));
         }
     }
 

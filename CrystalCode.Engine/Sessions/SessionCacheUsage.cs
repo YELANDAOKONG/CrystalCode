@@ -17,6 +17,9 @@ public sealed record SessionCacheUsage
     public long ComparableReadTokens { get; init; }
     public IReadOnlyList<ProviderCacheWriteUsage> WritesByLifetime { get; init; } = [];
 
+    /// <summary>The same totals per request scope. Requests saved before scopes were recorded are absent.</summary>
+    public IReadOnlyList<SessionCacheScopeUsage> ByScope { get; init; } = [];
+
     public decimal? GetReadRatePercent() => ComparableInputTokens > 0
         ? 100m * ComparableReadTokens / ComparableInputTokens
         : null;
@@ -32,7 +35,7 @@ public sealed record SessionCacheUsage
     {
         var comparable = usage.InputTokens is > 0 && usage.ReadTokens is >= 0
             && usage.ReadTokens <= usage.InputTokens;
-        return Add(new SessionCacheUsage
+        var single = new SessionCacheUsage
         {
             RequestCount = 1,
             InputTokens = usage.InputTokens,
@@ -48,7 +51,8 @@ public sealed record SessionCacheUsage
             ComparableInputTokens = comparable ? usage.InputTokens.GetValueOrDefault() : 0,
             ComparableReadTokens = comparable ? usage.ReadTokens.GetValueOrDefault() : 0,
             WritesByLifetime = usage.WritesByLifetime ?? []
-        });
+        };
+        return Add(usage.Scope is null ? single : single with { ByScope = [new SessionCacheScopeUsage(usage.Scope, single)] });
     }
 
     internal SessionCacheUsage Add(SessionCacheUsage usage) => this with
@@ -65,7 +69,8 @@ public sealed record SessionCacheUsage
         ComparableRequests = ComparableRequests + usage.ComparableRequests,
         ComparableInputTokens = ComparableInputTokens + usage.ComparableInputTokens,
         ComparableReadTokens = ComparableReadTokens + usage.ComparableReadTokens,
-        WritesByLifetime = ProviderCacheWriteUsage.Add(WritesByLifetime, usage.WritesByLifetime)
+        WritesByLifetime = ProviderCacheWriteUsage.Add(WritesByLifetime, usage.WritesByLifetime),
+        ByScope = SessionCacheScopeUsage.Add(ByScope, usage.ByScope)
     };
 
     private static long? AddReported(long? total, long? added) =>

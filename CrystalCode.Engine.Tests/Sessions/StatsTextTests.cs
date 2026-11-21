@@ -63,4 +63,21 @@ public sealed class StatsTextTests
         Assert.Contains(("Cache misses", "40"), rows);
         Assert.Contains(("Cache miss rate", "40.0%"), rows);
     }
+
+    [Fact]
+    public void UsageRows_SplitByScopeOnlyWhenAChildOrAuxiliaryRequestExists()
+    {
+        var main = new SessionCacheUsage { RequestCount = 2, ComparableRequests = 2, ComparableInputTokens = 100, ComparableReadTokens = 50 };
+        var child = new SessionCacheUsage { RequestCount = 1, ComparableRequests = 1, ComparableInputTokens = 10, ComparableReadTokens = 10 };
+        var mainOnly = main with { ByScope = [new SessionCacheScopeUsage("Main", main)] };
+        var mixed = main with
+        {
+            ByScope = [new SessionCacheScopeUsage("Main", main), new SessionCacheScopeUsage("Child", child)]
+        };
+
+        Assert.DoesNotContain(StatsText.UsageRows(mainOnly), row => row.Label == "By scope");
+        var rows = StatsText.UsageRows(mixed);
+        Assert.Contains(("  Main", "2 req, 50.0% read"), rows);
+        Assert.Contains(("  Child", "1 req, 100.0% read"), rows);
+    }
 }

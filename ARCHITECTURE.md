@@ -2583,7 +2583,12 @@ section also lists the request count, miss tokens, and the miss rate that
 complements the read rate. An active session that has cache usage but no saved
 document yet is still included. `/status full` shows a request cache read rate
 when every request reported both input and cache reads, and shows
-"None reported yet" until the turn's first request reports.
+"None reported yet" until the turn's first request reports. Each cache sample
+records its request scope (Main, Child, or Auxiliary), so `/stats` and the
+`/status full` Session cache section add a By scope split when a child or
+auxiliary request exists. The split never groups by provider or model; the
+per-turn request diagnostics remain the only provider view. Samples saved
+before scopes were recorded do not appear in the split.
 
 The Overview, Tokens, and Tools sections retain the existing session date
 filter. The token section uses known session totals, including a saved
