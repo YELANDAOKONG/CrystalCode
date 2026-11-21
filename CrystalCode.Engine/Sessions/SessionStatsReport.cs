@@ -29,7 +29,5 @@ public sealed record SessionStatsReport(
 
     public SessionCacheUsage? CacheUsage { get; init; }
 
-    public decimal? CacheReadRatePercent => CacheUsage is { ComparableInputTokens: > 0 } cache
-        ? 100m * cache.ComparableReadTokens / cache.ComparableInputTokens
-        : null;
+    public decimal? CacheReadRatePercent => CacheUsage?.GetReadRatePercent();
 }

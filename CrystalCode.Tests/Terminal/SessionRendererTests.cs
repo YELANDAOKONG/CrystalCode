@@ -102,6 +102,36 @@ public sealed class SessionRendererTests
     }
 
     [Fact]
+    public void CacheUsageChanged_UpdatesConfiguredStatusFields()
+    {
+        using var renderer = new SessionRenderer();
+        var projection = new SessionProjection(renderer);
+        renderer.SetStatusLine(true,
+            ["session-cache-input", "session-cache-hit-rate", "session-cache-read", "session-cache-write", "session-cache-miss", "session-cache-miss-rate"],
+            [], [], titleCase: false);
+
+        projection.OnEvent(new CacheUsageChanged(new SessionCacheUsage
+        {
+            InputTokens = 120,
+            ReadTokens = 80,
+            WriteTokens = 20,
+            MissTokens = 30,
+            ComparableInputTokens = 100,
+            ComparableReadTokens = 80
+        }));
+
+        var chrome = Assert.IsType<ShellChrome>(typeof(SessionRenderer)
+            .GetField("_chrome", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(renderer));
+        var line = chrome.StatusLine(180).Plain;
+        Assert.Contains("120 Cache Input", line, StringComparison.Ordinal);
+        Assert.Contains("Cache Hit 80.0%", line, StringComparison.Ordinal);
+        Assert.Contains("80 Cache Read", line, StringComparison.Ordinal);
+        Assert.Contains("20 Cache Write", line, StringComparison.Ordinal);
+        Assert.Contains("30 Cache Miss Tokens", line, StringComparison.Ordinal);
+        Assert.Contains("Cache Miss Rate 20.0%", line, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SetChrome_UpdatesContextWindowOnlyWhenProvided()
     {
         var renderer = new SessionRenderer();

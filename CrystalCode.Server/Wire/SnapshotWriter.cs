@@ -54,6 +54,7 @@ public static class SnapshotWriter
         writer.WriteEndArray();
         WireWriter.Usage(writer, "usage", snapshot.Usage);
         WireWriter.Usage(writer, "cumulativeUsage", snapshot.CumulativeUsage);
+        WireWriter.CacheUsage(writer, "cacheUsage", snapshot.CacheUsage);
         writer.WriteNumber("contextWindow", snapshot.ContextWindow);
         if (snapshot.EstimatedContextTokens is { } estimate)
         {

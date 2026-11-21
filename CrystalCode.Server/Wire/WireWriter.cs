@@ -907,40 +907,7 @@ public static class WireWriter
         writer.WriteNumber("cacheTrackedSessions", report.CacheTrackedSessions);
         if (report.CacheUsage is { } cache)
         {
-            writer.WriteStartObject("cacheUsage");
-            writer.WriteNumber("requestCount", cache.RequestCount);
-            WriteUsageCount(writer, "readTokens", cache.ReadTokens);
-            WriteUsageCount(writer, "writeTokens", cache.WriteTokens);
-            writer.WriteNumber("readReports", cache.ReadReports);
-            writer.WriteNumber("writeReports", cache.WriteReports);
-            writer.WriteNumber("comparableRequests", cache.ComparableRequests);
-            writer.WriteNumber("comparableInputTokens", cache.ComparableInputTokens);
-            writer.WriteNumber("comparableReadTokens", cache.ComparableReadTokens);
-            if (report.CacheReadRatePercent is { } rate)
-            {
-                writer.WriteNumber("readRatePercent", rate);
-            }
-            else
-            {
-                writer.WriteNull("readRatePercent");
-            }
-
-            if (cache.WritesByLifetime.Count > 0)
-            {
-                writer.WriteStartArray("writesByLifetime");
-                foreach (var writes in cache.WritesByLifetime)
-                {
-                    writer.WriteStartObject();
-                    writer.WriteNumber("lifetimeSeconds", writes.LifetimeSeconds);
-                    writer.WriteNumber("tokens", writes.Tokens);
-                    writer.WriteNumber("reports", writes.Reports);
-                    writer.WriteEndObject();
-                }
-
-                writer.WriteEndArray();
-            }
-
-            writer.WriteEndObject();
+            CacheUsage(writer, "cacheUsage", cache);
         }
 
         writer.WriteNumber("windowDays", report.WindowDays);
@@ -970,6 +937,54 @@ public static class WireWriter
         writer.WriteNumber("userTurns", summary.UserTurns);
         writer.WriteString("preview", summary.Preview);
         Optional(writer, "topic", summary.Topic);
+        writer.WriteEndObject();
+    }
+
+    internal static void CacheUsage(Utf8JsonWriter writer, string name, SessionCacheUsage? cache)
+    {
+        if (cache is null)
+        {
+            writer.WriteNull(name);
+            return;
+        }
+
+        writer.WriteStartObject(name);
+        writer.WriteNumber("requestCount", cache.RequestCount);
+        WriteUsageCount(writer, "inputTokens", cache.InputTokens);
+        WriteUsageCount(writer, "missTokens", cache.MissTokens);
+        WriteUsageCount(writer, "readTokens", cache.ReadTokens);
+        writer.WriteNumber("inputReports", cache.InputReports);
+        writer.WriteNumber("missReports", cache.MissReports);
+        WriteUsageCount(writer, "writeTokens", cache.WriteTokens);
+        writer.WriteNumber("readReports", cache.ReadReports);
+        writer.WriteNumber("writeReports", cache.WriteReports);
+        writer.WriteNumber("comparableRequests", cache.ComparableRequests);
+        writer.WriteNumber("comparableInputTokens", cache.ComparableInputTokens);
+        writer.WriteNumber("comparableReadTokens", cache.ComparableReadTokens);
+        if (cache.GetReadRatePercent() is { } rate)
+        {
+            writer.WriteNumber("readRatePercent", rate);
+        }
+        else
+        {
+            writer.WriteNull("readRatePercent");
+        }
+
+        if (cache.WritesByLifetime.Count > 0)
+        {
+            writer.WriteStartArray("writesByLifetime");
+            foreach (var writes in cache.WritesByLifetime)
+            {
+                writer.WriteStartObject();
+                writer.WriteNumber("lifetimeSeconds", writes.LifetimeSeconds);
+                writer.WriteNumber("tokens", writes.Tokens);
+                writer.WriteNumber("reports", writes.Reports);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+        }
+
         writer.WriteEndObject();
     }
 

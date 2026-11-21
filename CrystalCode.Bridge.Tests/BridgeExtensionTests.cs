@@ -48,7 +48,7 @@ public sealed class BridgeExtensionTests
         var snapshot = (await fixture.RequestAsync("_crystal/snapshot", new { sessionId = id })).GetProperty("result");
 
         foreach (var field in new[] { "chrome", "preferences", "commands", "promptHistory", "conversation", "live", "turnActive",
-                     "activity", "queue", "todos", "statusFields", "usage", "cumulativeUsage", "contextWindow", "side", "children", "lastTurn" })
+                     "activity", "queue", "todos", "statusFields", "usage", "cumulativeUsage", "cacheUsage", "contextWindow", "side", "children", "lastTurn" })
         {
             Assert.True(snapshot.TryGetProperty(field, out _), field);
         }

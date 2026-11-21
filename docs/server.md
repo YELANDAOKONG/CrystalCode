@@ -433,7 +433,7 @@ unwrapped, so a child's text arrives as `stream.text` with a `source`. Every
 | `TurnStarted`, `TurnFinished`, `ModelRoundClosed` | `turn.started`, `turn.finished`, `round.closed` |
 | `StreamReceived` | `stream.text`, `stream.reasoning`, `stream.reasoning-state`, `stream.tool-call`, `stream.usage`, `stream.completed` |
 | `ToolCallsIssued`, `ToolResultsReceived` | `tools.called`, `tools.results` |
-| `RetryScheduled`, `UsageChanged`, `ContextEstimated` | `retry.scheduled`, `usage.changed`, `context.estimated` |
+| `RetryScheduled`, `UsageChanged`, `CacheUsageChanged`, `ContextEstimated` | `retry.scheduled`, `usage.changed`, `cache-usage.changed` (`cacheUsage`), `context.estimated` |
 | `QueueChanged`, `TodosChanged` | `queue.changed`, `todos.changed` |
 | `PursueChanged`, `PursueChecked` | `pursue.changed` (`pursue`: null, or `objective`, `status`, `phase`, `reasonCode`, `reason`, `checks`, `continuations`, `stalls`, `nextStep`), `pursue.checked` (`index`, `verdict`, `reason`, `nextStep`, `evidence`, `usage`). `/pursue start` and `resume` run as one turn: one `turn.started` and one `turn.finished`, with stop reasons `pursue_blocked` and `pursue_limit_reached` in addition to the usual ones. Activity values `checking_objective` and `waiting_for_task` appear while the checker runs or a background task is awaited |
 | `HistoryReplayed`, `ConversationCleared` | `conversation.replayed`, `conversation.cleared` |
@@ -451,15 +451,20 @@ When `/status full` has provider request diagnostics, `report.status` includes
 and `uncachedInputTokens`. The `coverage` object gives each token field's
 report count. Optional `cacheWritesByLifetime` entries carry
 `lifetimeSeconds`, `tokens`, and `reports`.
+Live `cache-usage.changed` events and the session snapshot use the same
+explicit `cacheUsage` shape, or `null` when the session has no cache reports.
+It includes reported input, miss, read, and write token totals with coverage
+counts, plus comparable input and read totals used for the hit rate.
 
 `report.stats` token totals are nullable. `report.tokenTrackedSessions`
 and `report.reasoningTrackedSessions` give the coverage of the session totals
 and reasoning counters. `report.cacheWindowDays` is present for a cache
 request time window. `report.cacheTrackedSessions` counts sessions that
 contributed cache diagnostics. The optional `report.cacheUsage` summary carries `requestCount`,
-nullable `readTokens` and `writeTokens`, `readReports`, `writeReports`,
-`comparableRequests`, `comparableInputTokens`, `comparableReadTokens`, and
-nullable `readRatePercent`. Optional `writesByLifetime` entries carry
+nullable `inputTokens`, `readTokens`, `writeTokens`, and `missTokens`, their
+coverage counts, `comparableRequests`, `comparableInputTokens`,
+`comparableReadTokens`, and nullable `readRatePercent`. Optional
+`writesByLifetime` entries carry
 `lifetimeSeconds`, `tokens`, and `reports`.
 
 The chrome object in `session.started`, `chrome.changed`, and the snapshot

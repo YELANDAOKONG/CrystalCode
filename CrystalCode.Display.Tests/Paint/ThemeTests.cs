@@ -199,6 +199,43 @@ public sealed class ThemeTests : IDisposable
         Assert.Equal("grey50", Theme.ForValue("tier", "Flex"));
     }
 
+    [Fact]
+    public void CacheHitRateGauge_UsesPercentageRanges()
+    {
+        var gauges = new Dictionary<string, IReadOnlyList<GaugeRule>>
+        {
+            ["session-cache-hit-rate"] = [Range(80, 100, "green"), Range(0, 79, "yellow")]
+        };
+
+        Assert.True(Theme.TryApply(new Dictionary<string, string>(), gauges, out var error), error);
+
+        Assert.Equal("green", Theme.ForValue("session-cache-hit-rate", "90.0%", number: 90));
+        Assert.Equal("yellow", Theme.ForValue("session-cache-hit-rate", "50.0%", number: 50));
+        Theme.Reset();
+
+        Assert.False(Theme.TryApply(new Dictionary<string, string>(), new Dictionary<string, IReadOnlyList<GaugeRule>>
+        {
+            ["session-cache-hit-rate"] = [Range(0, 101, "red")]
+        }, out _));
+    }
+
+    [Fact]
+    public void CacheMetrics_AreAcceptedByStatusTheme()
+    {
+        var colors = new Dictionary<string, string>
+        {
+            ["status.session-cache-input"] = "cyan",
+            ["status.session-cache-read"] = "teal",
+            ["status.session-cache-write"] = "orange1",
+            ["status.session-cache-miss"] = "grey"
+        };
+
+        Assert.True(Theme.TryApply(colors, out var error), error);
+
+        Assert.Equal("teal", Theme.ForStatus("session-cache-read", Theme.Chrome));
+        Theme.Reset();
+    }
+
     [Theory]
     [InlineData("thinking", "match", "(")]
     [InlineData("thinking", "bad-style", "")]

@@ -468,6 +468,10 @@ separate library with no terminal code. The product can:
   token-weighted cache read rate in `/stats`. The rate uses the requests
   that report both a valid input total and a cache read count. A date
   window limits cache statistics by request start time;
+- let operators add the live session's cache hit rate, reported cache input,
+  read and write tokens, uncached input, and the cache miss rate to the
+  terminal's custom status line. Missing metrics occupy no cell. The theme can set a color for each
+  field and color the hit rate by percentage range;
 - sign in to a provider with an account instead of an API key. A provider
   definition with `type` `authentication` names an authentication integration
   and lists its own models. `crystal login <provider>` and `/login` run the

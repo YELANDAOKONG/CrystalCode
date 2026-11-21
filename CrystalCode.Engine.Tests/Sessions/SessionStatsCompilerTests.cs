@@ -39,8 +39,12 @@ public sealed class SessionStatsCompilerTests
         await original.RunTurnAsync("first");
         await original.RunTurnAsync("second");
         var stored = original.ReadSaved();
+        Assert.Equal(2, original.Observer.Events.OfType<CacheUsageChanged>().Count());
         Assert.Equal(2, stored.CacheUsage!.RequestCount);
         Assert.Equal(60, stored.CacheUsage.ReadTokens);
+        Assert.Equal(300, stored.CacheUsage.InputTokens);
+        Assert.Equal(40, stored.CacheUsage.MissTokens);
+        Assert.Equal(2, stored.CacheUsage.InputReports);
 
         using var resumed = new HeadlessSession(new ScriptedStreamingClient(reply, reply), stored, observeRequest: Report);
         await resumed.Session.StartAsync(CancellationToken.None);
@@ -57,9 +61,13 @@ public sealed class SessionStatsCompilerTests
         Assert.Equal(2, report.CacheTrackedSessions);
         Assert.Equal(4, cache.RequestCount);
         Assert.Equal(85, cache.ReadTokens);
+        Assert.Equal(450, cache.InputTokens);
+        Assert.Equal(165, cache.MissTokens);
         Assert.Equal(5, cache.WriteTokens);
         Assert.Equal(3, cache.ReadReports);
         Assert.Equal(2, cache.WriteReports);
+        Assert.Equal(4, cache.InputReports);
+        Assert.Equal(3, cache.MissReports);
         Assert.Equal(250, cache.ComparableInputTokens);
         Assert.Equal(34m, report.CacheReadRatePercent);
         Assert.Equal(new ProviderCacheWriteUsage(300, 5, 1), Assert.Single(cache.WritesByLifetime));

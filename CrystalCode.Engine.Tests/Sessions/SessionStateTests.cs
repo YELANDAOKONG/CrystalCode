@@ -66,6 +66,28 @@ public sealed class SessionStateTests
     }
 
     [Fact]
+    public void Snapshot_KeepsCacheUsageForReconnects()
+    {
+        var state = new SessionState();
+        var usage = new SessionCacheUsage
+        {
+            RequestCount = 1,
+            InputTokens = 100,
+            ReadTokens = 60,
+            ComparableInputTokens = 100,
+            ComparableReadTokens = 60
+        };
+
+        state.Apply(new CacheUsageChanged(usage));
+
+        Assert.Same(usage, state.Snapshot().CacheUsage);
+
+        state.Apply(new ConversationCleared());
+
+        Assert.Null(state.Snapshot().CacheUsage);
+    }
+
+    [Fact]
     public void Snapshot_KeepsACompactionSummaryWhetherOrNotItIsShown()
     {
         var state = new SessionState();

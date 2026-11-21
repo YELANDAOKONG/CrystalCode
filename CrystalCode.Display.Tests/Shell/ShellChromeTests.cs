@@ -356,6 +356,44 @@ public sealed class ShellChromeTests
     }
 
     [Fact]
+    public void StatusLine_ShowsAndThemesCacheMetrics()
+    {
+        try
+        {
+            Assert.True(Theme.TryApply(
+                new Dictionary<string, string> { ["status.session-cache-read"] = "teal" },
+                new Dictionary<string, IReadOnlyList<GaugeRule>>
+                {
+                    ["session-cache-hit-rate"] = [new(80, 100, [], null, "green")],
+                    ["session-cache-miss-rate"] = [new(0, 20, [], null, "cyan")]
+                },
+                out var error), error);
+            var chrome = new ShellChrome
+            {
+                CustomStatusLine = true,
+                StatusLineFields = ["session-cache-input", "session-cache-hit-rate", "session-cache-read", "session-cache-write", "session-cache-miss", "session-cache-miss-rate"],
+                SessionCacheInput = "100 Cache Input",
+                SessionCacheHitRate = 80,
+                SessionCacheRead = "80 Cache Read",
+                SessionCacheWrite = "20 Cache Write",
+                SessionCacheMiss = "20 Cache Miss Tokens",
+                SessionCacheMissRate = 20
+            };
+
+            var line = chrome.StatusLine(180);
+
+            Assert.Contains("100 Cache Input  ·  Cache Hit 80.0%  ·  80 Cache Read  ·  20 Cache Write  ·  20 Cache Miss Tokens  ·  Cache Miss Rate 20.0%", line.Plain, StringComparison.Ordinal);
+            Assert.Contains("[green]Cache Hit 80.0%[/]", line.Markup, StringComparison.Ordinal);
+            Assert.Contains("[cyan]Cache Miss Rate 20.0%[/]", line.Markup, StringComparison.Ordinal);
+            Assert.Contains("[teal]80 Cache Read[/]", line.Markup, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Theme.Reset();
+        }
+    }
+
+    [Fact]
     public void StatusLine_ColorsCustomContextFieldsFromUsedPercent()
     {
         var chrome = new ShellChrome

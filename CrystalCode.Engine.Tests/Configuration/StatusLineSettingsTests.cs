@@ -15,6 +15,21 @@ public sealed class StatusLineSettingsTests
     }
 
     [Fact]
+    public void Fields_AcceptSessionCacheMetrics()
+    {
+        string[] fields =
+        [
+            "session-cache-input", "session-cache-hit-rate", "session-cache-read", "session-cache-write",
+            "session-cache-miss", "session-cache-miss-rate"
+        ];
+
+        var settings = new StatusLineSettings(true, fields);
+
+        Assert.Equal(fields, settings.Fields);
+        Assert.All(fields, field => Assert.DoesNotContain(field, StatusLineSettings.DefaultFields));
+    }
+
+    [Fact]
     public void Fields_AcceptApprovalAndExtendedApprovalFields()
     {
         string[] fields =

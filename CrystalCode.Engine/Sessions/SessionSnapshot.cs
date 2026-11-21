@@ -40,4 +40,5 @@ public sealed record SessionSnapshot(
     IReadOnlyList<ChildSessionDocument> Children,
     TurnFinished? LastTurn,
     IReadOnlyList<ApprovalPassed> Approvals,
-    PursueState? Pursue = null);
+    PursueState? Pursue = null,
+    SessionCacheUsage? CacheUsage = null);

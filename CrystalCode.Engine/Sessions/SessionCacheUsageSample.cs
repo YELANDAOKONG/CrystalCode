@@ -6,4 +6,5 @@ public sealed record SessionCacheUsageSample(
     long? InputTokens,
     long? ReadTokens,
     long? WriteTokens,
-    IReadOnlyList<ProviderCacheWriteUsage>? WritesByLifetime);
+    IReadOnlyList<ProviderCacheWriteUsage>? WritesByLifetime,
+    long? UncachedInputTokens = null);

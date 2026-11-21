@@ -913,6 +913,23 @@ public sealed class SessionRenderer : IDisposable
         }
     }
 
+    internal void SetCacheUsage(SessionCacheUsage? usage)
+    {
+        lock (_gate)
+        {
+            _chrome.SessionCacheHitRate = usage?.GetReadRatePercent();
+            _chrome.SessionCacheInput = UsageText.FormatScoped(usage?.InputTokens, "Cache Input");
+            _chrome.SessionCacheRead = UsageText.FormatScoped(usage?.ReadTokens, "Cache Read");
+            _chrome.SessionCacheWrite = UsageText.FormatScoped(usage?.WriteTokens, "Cache Write");
+            _chrome.SessionCacheMiss = UsageText.FormatScoped(usage?.GetMissTokens(), "Cache Miss Tokens");
+            _chrome.SessionCacheMissRate = usage?.GetMissRatePercent();
+            if (_chrome.CustomStatusLine)
+            {
+                PaintUnlocked(force: true);
+            }
+        }
+    }
+
     public void WriteUser(string text)
     {
         Add(TranscriptKind.User, text);

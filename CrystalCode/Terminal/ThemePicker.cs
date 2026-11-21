@@ -15,7 +15,7 @@ namespace CrystalCode.Terminal;
 internal sealed class ThemePicker
 {
     private const int MaximumVisibleRows = 8;
-    private const int SampleRows = 10;
+    private const int SampleRows = 12;
     private const int ChromeRows = 8;
     private readonly SessionRenderer _renderer;
     private readonly CrystalHome _home;
@@ -146,6 +146,14 @@ internal sealed class ThemePicker
         yield return Line(Theme.Muted, "Muted detail");
         yield return Line(Theme.Thinking, "Thinking text");
         yield return Line(Theme.Tool, "Tool call");
+        yield return new Markup(
+            $"[{Theme.ForStatus("session-cache-input", Theme.Chrome)}]Cache Input 120K[/]  "
+            + $"[{Theme.ForValue("session-cache-hit-rate", "82.0%", Theme.ForStatus("session-cache-hit-rate", Theme.Chrome), 82)}]Cache Hit 82.0%[/]");
+        yield return new Markup(
+            $"[{Theme.ForStatus("session-cache-read", Theme.Chrome)}]Cache Read 98K[/]  "
+            + $"[{Theme.ForStatus("session-cache-write", Theme.Chrome)}]Cache Write 22K[/]  "
+            + $"[{Theme.ForStatus("session-cache-miss", Theme.Chrome)}]Cache Miss 22K[/]  "
+            + $"[{Theme.ForValue("session-cache-miss-rate", "18.0%", Theme.ForStatus("session-cache-miss-rate", Theme.Chrome), 18)}]Cache Miss Rate 18.0%[/]");
         yield return new Markup(
             $"[{Theme.Ok}]ok[/]  [{Theme.Warning}]warning[/]  [{Theme.Fail}]fail[/]  "
             + $"[{Theme.Work}]work[/]  [{Theme.Plan}]plan[/]  [{Theme.Custom}]custom[/]  [{Theme.Accent}]accent[/]");

@@ -31,6 +31,15 @@ public sealed class ThemePickerTests
     }
 
     [Fact]
+    public void Render_SamplesCacheStatusColors()
+    {
+        var text = Draw(ThemePicker.Render(["default"], 0, "default", failure: null));
+
+        Assert.Contains("Cache Hit 82.0%", text, StringComparison.Ordinal);
+        Assert.Contains("Cache Write 22K", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Render_DrawsAScrollbarWhenThereAreMoreThemesThanRows()
     {
         var names = Enumerable.Range(0, 40).Select(index => "theme" + index).ToArray();

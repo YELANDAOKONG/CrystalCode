@@ -98,6 +98,18 @@ public sealed class ShellChrome
 
     public string SessionTotal { get; set; } = string.Empty;
 
+    public string SessionCacheInput { get; set; } = string.Empty;
+
+    public decimal? SessionCacheHitRate { get; set; }
+
+    public decimal? SessionCacheMissRate { get; set; }
+
+    public string SessionCacheRead { get; set; } = string.Empty;
+
+    public string SessionCacheWrite { get; set; } = string.Empty;
+
+    public string SessionCacheMiss { get; set; } = string.Empty;
+
     public string PursueStatus { get; set; } = string.Empty;
 
     public int? PursueChecks { get; set; }
@@ -308,6 +320,16 @@ public sealed class ShellChrome
                 "session-input" => SessionInput,
                 "session-output" => SessionOutput,
                 "session-total" => SessionTotal,
+                "session-cache-input" => SessionCacheInput,
+                "session-cache-hit-rate" => SessionCacheHitRate is { } rate
+                    ? FormattableString.Invariant($"Cache Hit {rate:0.0}%")
+                    : string.Empty,
+                "session-cache-miss-rate" => SessionCacheMissRate is { } missRate
+                    ? FormattableString.Invariant($"Cache Miss Rate {missRate:0.0}%")
+                    : string.Empty,
+                "session-cache-read" => SessionCacheRead,
+                "session-cache-write" => SessionCacheWrite,
+                "session-cache-miss" => SessionCacheMiss,
                 "tools" => ToolCount switch { 0 => string.Empty, 1 => "1 Tool", _ => $"{ToolCount} Tools" },
                 "elapsed" => Elapsed,
                 "queued" => Queued > 0 ? $"Queued {Queued}" : string.Empty,
@@ -341,6 +363,10 @@ public sealed class ShellChrome
                     "request-input" or "session-input" => Theme.ForStatus("input", Theme.Chrome),
                     "request-output" or "session-output" => Theme.ForStatus("output", Theme.Chrome),
                     "request-total" or "session-total" => Theme.ForStatus("total", Theme.Chrome),
+                    "session-cache-hit-rate" => Theme.ForValue(field, value, Theme.ForStatus(field, Theme.Chrome), (double?)SessionCacheHitRate),
+                    "session-cache-miss-rate" => Theme.ForValue(field, value, Theme.ForStatus(field, Theme.Chrome), (double?)SessionCacheMissRate),
+                    "session-cache-input" => Theme.ForStatus(field, Theme.Chrome),
+                    "session-cache-read" or "session-cache-write" or "session-cache-miss" => Theme.ForStatus(field, Theme.Chrome),
                     "workspace" => Theme.ForStatus("path", Theme.Chrome),
                     "tools" => Theme.ForStatus("tools", Theme.Chrome),
                     "elapsed" => Theme.ForStatus("elapsed", Theme.Chrome),

@@ -1208,6 +1208,7 @@ public sealed class CodingSession : ITurnObserver
     private readonly object _usageGate = new();
     private ProviderUsageLedger _providerUsage;
     private SessionCacheUsage? _savedCacheUsage;
+    private SessionCacheUsage? _publishedCacheUsage;
     private readonly SessionReviewContext _reviewContext = new();
     private readonly SessionLedger _ledger = new();
     private ChildSessionStore _children = new();
@@ -1749,6 +1750,10 @@ public sealed class CodingSession : ITurnObserver
         if (_replayOnStart)
         {
             PresentResume();
+        }
+        else
+        {
+            PublishCacheUsage();
         }
 
         WritePromptNotes();
@@ -3104,6 +3109,7 @@ public sealed class CodingSession : ITurnObserver
                 // only from ChromeChanged. Resume and fork refresh before their redraw.
                 RefreshChrome();
                 Publish(new ConversationCleared());
+                PublishCacheUsage();
                 ShowUsage(null, null);
                 Note("New conversation");
                 return (true, false);
@@ -6469,7 +6475,11 @@ public sealed class CodingSession : ITurnObserver
         return new ProviderRequestContext(
             child ?? parent,
             child is null ? null : parent,
-            usage => ledger.Record(scope, settings.Provider.Value, settings.Model, usage, startedUtc),
+            usage =>
+            {
+                ledger.Record(scope, settings.Provider.Value, settings.Model, usage, startedUtc);
+                PublishCacheUsage();
+            },
             IsAuxiliary: auxiliary);
     }
 
@@ -7756,6 +7766,8 @@ public sealed class CodingSession : ITurnObserver
                 RefreshChrome();
                 ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
                 Publish(new HistoryReplayed(ArchiveSnapshot()));
+                _publishedCacheUsage = null;
+                PublishCacheUsage();
                 ShowTodos();
                 ShowPursue();
                 Note($"Forked  {sourceId}  ->  {_sessionId}");
@@ -7927,6 +7939,8 @@ public sealed class CodingSession : ITurnObserver
         RefreshChrome();
         ShowUsage(_ledger.Usage, _ledger.CumulativeUsage);
         Publish(new HistoryReplayed(ArchiveSnapshot()));
+        _publishedCacheUsage = null;
+        PublishCacheUsage();
         Note("Resumed  " + _sessionId);
         FlushModeNote();
         if (_unavailableImages.Count > 0)
@@ -12799,6 +12813,21 @@ public sealed class CodingSession : ITurnObserver
         if (result.StopReason == TurnStopReason.Completed)
         {
             StartTopicIfNeeded();
+        }
+    }
+
+    private void PublishCacheUsage()
+    {
+        // Reports can finish concurrently. Read the active ledger in event order
+        // so a slow child or auxiliary call cannot publish an older snapshot.
+        lock (_eventGate)
+        {
+            var usage = Volatile.Read(ref _providerUsage).CacheSnapshot().Usage;
+            if (!ReferenceEquals(usage, _publishedCacheUsage))
+            {
+                _publishedCacheUsage = usage;
+                Publish(new CacheUsageChanged(usage));
+            }
         }
     }
 

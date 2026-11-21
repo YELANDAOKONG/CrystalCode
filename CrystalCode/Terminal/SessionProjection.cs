@@ -295,11 +295,14 @@ internal sealed class SessionProjection : ISessionObserver
     {
         lock (_projectionGate)
         {
-            // Pursue belongs to the parent even while a child transcript has focus.
+            // Pursue and session cache totals belong to the parent even while a child transcript has focus.
             switch (sessionEvent)
             {
                 case PursueChanged changed:
                     _renderer.SetPursue(changed.Pursue);
+                    return;
+                case CacheUsageChanged cache:
+                    _renderer.SetCacheUsage(cache.Usage);
                     return;
                 case ActivityChanged activity:
                     _renderer.SetPursueProgress(Caption(activity.Activity));

@@ -416,6 +416,7 @@ Crystal-aware client can tell sources apart. Child events also carry
 | `SessionStarted`, `ChromeChanged` | also `_crystal/chrome` with the full plain chrome |
 | `PreferencesChanged` | also `_crystal/preferences` |
 | `StatusFieldsChanged` | `_crystal/statusFields` |
+| `CacheUsageChanged` | `_crystal/cacheUsage` with the active session cache totals |
 | `ActivityChanged` | `_crystal/activity` (loading tools, loading plugins, compacting, naming topic, waiting for model, checking objective, waiting for task) |
 | `LoadingProgressed` | `_crystal/loading` with `kind` (`tool_set`, `plugin`, or `mcp_server`) and `name` |
 | `QueueChanged` | `_crystal/queue` |

@@ -41,6 +41,7 @@ public sealed class SessionState
     private SessionActivity _activity = SessionActivity.Idle;
     private TokenUsage? _usage;
     private TokenUsage? _cumulative;
+    private SessionCacheUsage? _cacheUsage;
     private int _contextWindow;
     private int? _estimate;
     private bool _turnActive;
@@ -121,6 +122,9 @@ public sealed class SessionState
             case ContextEstimated estimated:
                 _estimate = estimated.Tokens;
                 break;
+            case CacheUsageChanged cache:
+                _cacheUsage = cache.Usage;
+                break;
             case UserMessageSent sent:
                 _conversation.Add(new ChatMessage(ChatRole.User, sent.Text));
                 break;
@@ -158,6 +162,7 @@ public sealed class SessionState
                 _conversation.Clear();
                 _approvals.Clear();
                 _children.Clear();
+                _cacheUsage = null;
                 _round = null;
                 _lastTurn = null;
                 break;
@@ -166,6 +171,7 @@ public sealed class SessionState
                 _conversation.AddRange(replayed.Items);
                 _approvals.Clear();
                 _children.Clear();
+                _cacheUsage = null;
                 _round = null;
                 break;
             case ChildSessionChanged changed:
@@ -203,7 +209,8 @@ public sealed class SessionState
             [.. _children.Values],
             _lastTurn,
             [.. _approvals],
-            _pursue);
+            _pursue,
+            _cacheUsage);
 
     private void CommitRound()
     {

@@ -3331,6 +3331,18 @@ rides on `SessionPreferences.StatusLineTitleCase`; Server and Bridge write it as
 `statusLineTitleCase`. When on, the terminal sets `ShellChrome.NameFormat` to
 `DisplayCase.Token`, which formats the names the operator chose (prompt set,
 custom mode) on the status line. `/status` and the transcript keep them as written.
+The cache fields `session-cache-input`, `session-cache-hit-rate`,
+`session-cache-read`, `session-cache-write`, `session-cache-miss`, and
+`session-cache-miss-rate` use the active provider usage ledger. Reported input
+and read/write are totals; the hit rate is token-weighted over requests with
+valid input and cache-read counts. Miss counts use provider-reported uncached
+input when available, otherwise comparable input not read from cache. Miss
+rate complements the comparable hit rate. `CacheUsageChanged`
+publishes each ledger snapshot; the terminal, Server event/snapshot, and
+opted-in Bridge notification/snapshot map it explicitly. Clearing or replacing
+a session clears the reduced snapshot before its new cache usage is published.
+Themes accept a fixed `status` color for each cache field and percentage ranges
+at `gauges.session-cache-hit-rate` and `gauges.session-cache-miss-rate`.
 The adaptive bar keeps its fixed slot order.
 Each row is a checkbox colored
 by status: pending chrome, in progress accent, completed ok, cancelled

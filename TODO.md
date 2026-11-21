@@ -244,7 +244,10 @@ behavior stands until a specific change defines otherwise.
   and how live foreground output coexists with transcript cards are not yet
   defined; inspect the TUI and event ownership before implementation.
 - More detailed Status Line information for other front ends, with
-  corresponding front-end support.
+  corresponding front-end support. The cache fields `session-cache-input`,
+  `session-cache-hit-rate`, `session-cache-read`, `session-cache-write`,
+  `session-cache-miss`, and `session-cache-miss-rate` are implemented for the terminal; whether other front
+  ends add their own visual status lines remains open.
 
 These are part of the product direction and are not in the current build.
 The constraints are in `BUSINESS.md` under Deferred product work. Current

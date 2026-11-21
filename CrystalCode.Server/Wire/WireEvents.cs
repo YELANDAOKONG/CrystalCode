@@ -36,6 +36,7 @@ public static class WireEvents
         [typeof(ToolResultsReceived)] = "tools.results",
         [typeof(RetryScheduled)] = "retry.scheduled",
         [typeof(UsageChanged)] = "usage.changed",
+        [typeof(CacheUsageChanged)] = "cache-usage.changed",
         [typeof(ContextEstimated)] = "context.estimated",
         [typeof(QueueChanged)] = "queue.changed",
         [typeof(TodosChanged)] = "todos.changed",
@@ -197,6 +198,9 @@ public static class WireEvents
                 break;
             case ContextEstimated estimated:
                 writer.WriteNumber("tokens", estimated.Tokens);
+                break;
+            case CacheUsageChanged cache:
+                WireWriter.CacheUsage(writer, "cacheUsage", cache.Usage);
                 break;
             case QueueChanged queue:
                 writer.WriteStartArray("items");

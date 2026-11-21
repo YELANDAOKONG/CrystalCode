@@ -65,6 +65,7 @@ internal static class Extensions
         "_crystal/chrome",
         "_crystal/preferences",
         "_crystal/statusFields",
+        "_crystal/cacheUsage",
         "_crystal/promptHistory",
         "_crystal/imagesInvalidated",
         "_crystal/activity",

@@ -176,7 +176,12 @@ public static class Theme
     /// Status-bar items a theme file may color one by one, as members of its <c>status</c> object.
     /// An item the theme leaves unset keeps the color the status bar gave it before.
     /// </summary>
-    public static IReadOnlyList<string> StatusItems { get; } = ["input", "output", "total", "path", "tools", "elapsed", "agents-running", "scrollbar", "scrollbar-thumb"];
+    public static IReadOnlyList<string> StatusItems { get; } =
+    [
+        "input", "output", "total", "path", "tools", "elapsed", "agents-running", "scrollbar", "scrollbar-thumb",
+        "session-cache-input", "session-cache-hit-rate", "session-cache-read", "session-cache-write", "session-cache-miss",
+        "session-cache-miss-rate"
+    ];
 
     /// <summary>
     /// True when the terminal shows 24-bit color. Terminal.app and some multiplexers report 256 colors,
@@ -301,7 +306,7 @@ public static class Theme
     /// <summary>
     /// Gauge names a theme file may set ranges for.
     /// </summary>
-    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge, "thinking", "tier", "speed", "model", "context-window", "prompt-set", "mode", "provider", "topic", "agents", .. ReviewerGaugeNames];
+    public static IReadOnlyCollection<string> GaugeNames { get; } = [ContextGauge, "thinking", "tier", "speed", "model", "context-window", "prompt-set", "mode", "provider", "topic", "agents", "session-cache-hit-rate", "session-cache-miss-rate", .. ReviewerGaugeNames];
 
     /// <summary>
     /// Style for a context usage percentage. A theme's <c>context</c> rules
@@ -503,6 +508,8 @@ public static class Theme
             }
 
             var kind = name.Equals(ContextGauge, StringComparison.OrdinalIgnoreCase)
+                || name.Equals("session-cache-hit-rate", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("session-cache-miss-rate", StringComparison.OrdinalIgnoreCase)
                 ? GaugeKind.Percent
                 : name.Equals("context-window", StringComparison.OrdinalIgnoreCase)
                     ? GaugeKind.Tokens

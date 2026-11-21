@@ -69,6 +69,7 @@ internal sealed class SessionUpdates
     public static IReadOnlyList<Type> Notified { get; } =
     [
         typeof(StatusFieldsChanged),
+        typeof(CacheUsageChanged),
         typeof(PromptHistoryLoaded),
         typeof(ImageHistoryInvalidated),
         typeof(ActivityChanged),
@@ -215,6 +216,9 @@ internal sealed class SessionUpdates
                     break;
                 case StatusFieldsChanged fields:
                     _crystal("_crystal/statusFields", writer => CrystalWire.StatusFields(writer, "fields", fields.Fields));
+                    break;
+                case CacheUsageChanged cache:
+                    _crystal("_crystal/cacheUsage", writer => CrystalWire.CacheUsage(writer, "cacheUsage", cache.Usage));
                     break;
                 case PromptHistoryLoaded history:
                     _crystal("_crystal/promptHistory", writer => CrystalWire.Strings(writer, "entries", history.Entries));

@@ -274,6 +274,32 @@ public sealed class ServerParityTests
     }
 
     [Fact]
+    public void CacheUsageChanged_WritesCacheTotals()
+    {
+        var usage = new SessionCacheUsage
+        {
+            RequestCount = 1,
+            InputTokens = 100,
+            ReadTokens = 60,
+            MissTokens = 40,
+            WriteTokens = 10,
+            InputReports = 1,
+            ReadReports = 1,
+            MissReports = 1,
+            WriteReports = 1,
+            ComparableRequests = 1,
+            ComparableInputTokens = 100,
+            ComparableReadTokens = 60
+        };
+        var text = Json.Write(writer => WireEvents.Data(writer, new CacheUsageChanged(usage)));
+        using var document = JsonDocument.Parse(text);
+        var data = document.RootElement.GetProperty("data");
+
+        Assert.Equal(40, data.GetProperty("cacheUsage").GetProperty("missTokens").GetInt64());
+        Assert.Equal(60m, data.GetProperty("cacheUsage").GetProperty("readRatePercent").GetDecimal());
+    }
+
+    [Fact]
     public void Usage_WritesTotals()
     {
         var text = Json.Write(writer => WireWriter.Usage(writer, "usage", new TokenUsage(3, 4, 1)));

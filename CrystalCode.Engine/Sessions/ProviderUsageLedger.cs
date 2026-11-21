@@ -67,7 +67,12 @@ internal sealed class ProviderUsageLedger
                 CacheWritesByLifetime = ProviderCacheWriteUsage.Add(previous.CacheWritesByLifetime, writes ?? [])
             };
             _sessionCache.Record(new SessionCacheUsageSample(
-                startedUtc ?? DateTimeOffset.UtcNow, usage.InputTokens, usage.CacheReadTokens, usage.CacheWriteTokens, writes));
+                startedUtc ?? DateTimeOffset.UtcNow,
+                usage.InputTokens,
+                usage.CacheReadTokens,
+                usage.CacheWriteTokens,
+                writes,
+                usage.UncachedInputTokens));
         }
     }
 
