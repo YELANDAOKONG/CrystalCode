@@ -101,7 +101,7 @@ internal static class SessionStatsCompiler
             ?? (earliest is not null && latest is not null
                 ? Math.Max(1, (int)Math.Ceiling((latest.Value - earliest.Value).TotalDays))
                 : 0);
-        var (cacheTrackedSessions, cacheUsage) = CompileCache(sessions, cutoff, now);
+        var (cacheTrackedSessions, cacheUsage, cacheBreakdown) = CompileCache(sessions, cutoff, now);
         return new SessionStatsReport(
             sessionsCount,
             userTurns,
@@ -122,15 +122,16 @@ internal static class SessionStatsCompiler
             ReasoningTrackedSessions = reasoningTrackedSessions,
             CacheTrackedSessions = cacheTrackedSessions,
             CacheWindowDays = windowDays,
-            CacheUsage = cacheUsage
-        };
+            CacheUsage = cacheUsage,
+            CacheBreakdown = cacheBreakdown        };
     }
 
-    private static (int TrackedSessions, SessionCacheUsage? Usage) CompileCache(
+    private static (int TrackedSessions, SessionCacheUsage? Usage, IReadOnlyList<SessionCacheBreakdown> Breakdown) CompileCache(
         IReadOnlyList<SessionDocument> sessions, DateTimeOffset? cutoff, DateTimeOffset now)
     {
         var trackedSessions = 0;
         SessionCacheUsage? usage = null;
+        var samples = new List<SessionCacheUsageSample>();
         foreach (var session in sessions)
         {
             var cache = session.CacheUsage;
@@ -142,8 +143,13 @@ internal static class SessionStatsCompiler
                     if (sample.StartedUtc >= start && sample.StartedUtc <= now)
                     {
                         cache = (cache ?? new SessionCacheUsage()).Add(sample);
+                        samples.Add(sample);
                     }
                 }
+            }
+            else
+            {
+                samples.AddRange(session.CacheUsageSamples ?? []);
             }
 
             if (cache is { RequestCount: > 0 })
@@ -153,6 +159,6 @@ internal static class SessionStatsCompiler
             }
         }
 
-        return (trackedSessions, usage);
+        return (trackedSessions, usage, SessionCacheBreakdown.From(samples));
     }
 }

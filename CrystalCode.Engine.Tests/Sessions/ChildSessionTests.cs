@@ -573,7 +573,7 @@ public sealed class ChildSessionTests
         Assert.Equal(200, mainUsage.InputTokens);
         Assert.Equal(60, status.CumulativeUsage!.InputTokenCount);
         Assert.Equal(5, status.CacheUsage!.RequestCount);
-        Assert.Equal(new[] { "Main", "Child" }, status.CacheUsage.ByScope.Select(scope => scope.Scope));
+        Assert.Equal(new[] { "Main", "Child" }, status.CacheBreakdown.Select(row => row.Scope).Distinct());
     }
 
     [Fact]

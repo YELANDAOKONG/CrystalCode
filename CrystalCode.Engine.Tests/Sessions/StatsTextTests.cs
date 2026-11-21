@@ -69,15 +69,32 @@ public sealed class StatsTextTests
     {
         var main = new SessionCacheUsage { RequestCount = 2, ComparableRequests = 2, ComparableInputTokens = 100, ComparableReadTokens = 50 };
         var child = new SessionCacheUsage { RequestCount = 1, ComparableRequests = 1, ComparableInputTokens = 10, ComparableReadTokens = 10 };
-        var mainOnly = main with { ByScope = [new SessionCacheScopeUsage("Main", main)] };
-        var mixed = main with
-        {
-            ByScope = [new SessionCacheScopeUsage("Main", main), new SessionCacheScopeUsage("Child", child)]
-        };
+        var mainOnly = new[] { new SessionCacheBreakdown("Main", "p", "m", main) };
+        var mixed = new[] { mainOnly[0], new SessionCacheBreakdown("Child", "p", "m", child) };
 
-        Assert.DoesNotContain(StatsText.UsageRows(mainOnly), row => row.Label == "By scope");
-        var rows = StatsText.UsageRows(mixed);
+        Assert.DoesNotContain(StatsText.UsageRows(main, mainOnly), row => row.Label is "By scope" or "By model");
+        var rows = StatsText.UsageRows(main, mixed);
         Assert.Contains(("  Main", "2 req, 50.0% read"), rows);
         Assert.Contains(("  Child", "1 req, 100.0% read"), rows);
+        Assert.DoesNotContain(rows, row => row.Label == "By model");
+    }
+
+    [Fact]
+    public void UsageRows_SplitByModelOnlyAcrossModelsAndNameTheProviderOnlyForSharedNames()
+    {
+        var a = new SessionCacheUsage { RequestCount = 3, ComparableRequests = 3, ComparableInputTokens = 100, ComparableReadTokens = 80 };
+        var b = new SessionCacheUsage { RequestCount = 1, ComparableRequests = 1, ComparableInputTokens = 10, ComparableReadTokens = 0 };
+        var rows = StatsText.UsageRows(
+            a.Add(b),
+            [
+                new SessionCacheBreakdown("Main", "one", "alpha", a),
+                new SessionCacheBreakdown("Main", "two", "alpha", b),
+                new SessionCacheBreakdown("Main", "one", "beta", b)
+            ]);
+
+        Assert.Contains(("By model", string.Empty), rows);
+        Assert.Contains(("  alpha (one)", "3 req, 80.0% read"), rows);
+        Assert.Contains(("  alpha (two)", "1 req, 0.0% read"), rows);
+        Assert.Contains(("  beta", "1 req, 0.0% read"), rows);
     }
 }

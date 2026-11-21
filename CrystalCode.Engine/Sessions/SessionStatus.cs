@@ -66,4 +66,6 @@ public sealed record SessionStatus(
 
     /// <summary>Cache totals for the whole session across turns. Set for <c>/status full</c>.</summary>
     public SessionCacheUsage? CacheUsage { get; init; }
+
+    public IReadOnlyList<SessionCacheBreakdown> CacheBreakdown { get; init; } = [];
 }

@@ -455,8 +455,9 @@ Live `cache-usage.changed` events and the session snapshot use the same
 explicit `cacheUsage` shape, or `null` when the session has no cache reports.
 It includes reported input, miss, read, and write token totals with coverage
 counts, plus comparable input and read totals used for the hit rate. When
-requests carried a scope, `byScope` lists `Main`, `Child`, and `Auxiliary`
-entries with a `scope` name and the same totals. `/status full` also sets
+requests carried a scope, a `cacheBreakdown` array beside `cacheUsage` lists
+one row per `scope`, `provider`, and `model` with the same totals, so a client
+can group them itself. `/status full` also sets
 `status.cacheUsage` to the session's cumulative cache totals in this shape.
 
 `report.stats` token totals are nullable. `report.tokenTrackedSessions`

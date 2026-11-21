@@ -498,6 +498,8 @@ internal static class CrystalWire
             CacheUsage(writer, "cacheUsage", sessionCache);
         }
 
+        CacheBreakdown(writer, status.CacheBreakdown);
+
         if (status.RequestUsage is { Count: > 0 } requestUsage)
         {
             writer.WriteStartArray("requestUsage");
@@ -612,6 +614,8 @@ internal static class CrystalWire
         {
             CacheUsage(writer, "cacheUsage", cache);
         }
+
+        CacheBreakdown(writer, report.CacheBreakdown);
 
         writer.WriteNumber("windowDays", report.WindowDays);
         Date(writer, "earliest", report.Earliest);
@@ -928,21 +932,29 @@ internal static class CrystalWire
 
         writer.WriteStartObject(name);
         CacheFields(writer, cache);
-        if (cache.ByScope.Count > 0)
-        {
-            writer.WriteStartArray("byScope");
-            foreach (var scope in cache.ByScope)
-            {
-                writer.WriteStartObject();
-                writer.WriteString("scope", scope.Scope);
-                CacheFields(writer, scope.Usage);
-                writer.WriteEndObject();
-            }
+        writer.WriteEndObject();
+    }
 
-            writer.WriteEndArray();
+    // Rows keep scope, provider, and model separate so a client can group them as it likes.
+    private static void CacheBreakdown(Utf8JsonWriter writer, IReadOnlyList<SessionCacheBreakdown> rows)
+    {
+        if (rows.Count == 0)
+        {
+            return;
         }
 
-        writer.WriteEndObject();
+        writer.WriteStartArray("cacheBreakdown");
+        foreach (var row in rows)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("scope", row.Scope);
+            Optional(writer, "provider", row.Provider);
+            Optional(writer, "model", row.Model);
+            CacheFields(writer, row.Usage);
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
     }
 
     private static void CacheFields(Utf8JsonWriter writer, SessionCacheUsage cache)

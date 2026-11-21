@@ -78,13 +78,18 @@ public static class StatsText
             rows.Add(("Tracked sessions", $"{Count(report.CacheTrackedSessions)} / {Count(report.Sessions)}"));
         }
 
-        rows.AddRange(UsageRows(report.CacheUsage));
+        rows.AddRange(UsageRows(report.CacheUsage, report.CacheBreakdown));
         return rows.AsReadOnly();
     }
 
-    /// <summary>Cache totals, then a per-scope split when any request came from a child or auxiliary call.</summary>
-    public static IReadOnlyList<(string Label, string Value)> UsageRows(SessionCacheUsage? usage)
+    /// <summary>
+    /// Cache totals, then compact splits by scope and by model. A split appears only
+    /// when it adds information: a child or auxiliary request, or more than one model.
+    /// </summary>
+    public static IReadOnlyList<(string Label, string Value)> UsageRows(
+        SessionCacheUsage? usage, IReadOnlyList<SessionCacheBreakdown> breakdown)
     {
+        ArgumentNullException.ThrowIfNull(breakdown);
         var requests = usage?.RequestCount ?? 0;
         var rate = Percent(usage?.GetReadRatePercent());
         var missRate = Percent(usage?.GetMissRatePercent());
@@ -103,18 +108,45 @@ public static class StatsText
                 Covered(Count(writes.Tokens), writes.Reports, requests)));
         }
 
-        if (usage is { ByScope: { Count: > 0 } scopes } && scopes.Any(static scope => scope.Scope != "Main"))
+        var scopes = breakdown
+            .GroupBy(static row => row.Scope, StringComparer.Ordinal)
+            .Select(static group => (Label: group.Key, Usage: Merge(group)))
+            .ToList();
+        if (scopes.Any(static scope => scope.Label != "Main"))
         {
             rows.Add(("By scope", string.Empty));
-            foreach (var scope in scopes)
-            {
-                rows.Add(($"  {scope.Scope}",
-                    $"{Count(scope.Usage.RequestCount)} req, {Percent(scope.Usage.GetReadRatePercent())} read"));
-            }
+            rows.AddRange(scopes.Select(static scope => ($"  {scope.Label}", Share(scope.Usage))));
+        }
+
+        var models = breakdown
+            .Where(static row => row.Model is not null)
+            .GroupBy(static row => (row.Provider, row.Model))
+            .Select(static group => (group.Key.Provider, Model: group.Key.Model!, Usage: Merge(group)))
+            .OrderByDescending(static model => model.Usage.RequestCount)
+            .ThenBy(static model => model.Model, StringComparer.Ordinal)
+            .ToList();
+        if (models.Count > 1)
+        {
+            // Provider only disambiguates a model name served by more than one provider.
+            var shared = models.GroupBy(static model => model.Model).Where(static group => group.Count() > 1)
+                .Select(static group => group.Key).ToHashSet(StringComparer.Ordinal);
+            rows.Add(("By model", string.Empty));
+            rows.AddRange(models.Select(model => (
+                "  " + Fit(shared.Contains(model.Model) ? $"{model.Model} ({model.Provider})" : model.Model, 20),
+                Share(model.Usage))));
         }
 
         return rows.AsReadOnly();
     }
+
+    private static SessionCacheUsage Merge(IEnumerable<SessionCacheBreakdown> rows) =>
+        rows.Select(static row => row.Usage).Aggregate(static (total, usage) => total.Add(usage));
+
+    private static string Share(SessionCacheUsage usage) =>
+        $"{Count(usage.RequestCount)} req, {Percent(usage.GetReadRatePercent())} read";
+
+    private static string Fit(string text, int width) =>
+        text.Length <= width ? text : string.Concat(text.AsSpan(0, width - 2), "..");
 
     private static string Percent(decimal? value) =>
         value is { } percent ? percent.ToString("0.0", CultureInfo.InvariantCulture) + "%" : "--";

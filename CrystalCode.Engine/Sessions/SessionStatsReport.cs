@@ -29,5 +29,8 @@ public sealed record SessionStatsReport(
 
     public SessionCacheUsage? CacheUsage { get; init; }
 
+    /// <summary>Cache usage per scope, provider, and model for requests that recorded them.</summary>
+    public IReadOnlyList<SessionCacheBreakdown> CacheBreakdown { get; init; } = [];
+
     public decimal? CacheReadRatePercent => CacheUsage?.GetReadRatePercent();
 }

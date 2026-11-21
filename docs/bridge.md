@@ -435,7 +435,7 @@ When `/status full` has provider request diagnostics, the status report
 includes them in its text. For clients that use `_crystal/report`, the
 structured `status.requestUsage` entries use the same fields as the HTTP
 server. `status.cacheUsage` and the `/stats` cache totals use the HTTP
-server's cache fields, including `byScope`. The `/stats` report also includes
+server's cache fields, including `cacheBreakdown`. The `/stats` report also includes
 prompt cache totals in its text.
 | `CompactionStarted`, `CompactionFinished` | with `session.compaction`: `compaction_update` `in_progress`, then `compaction_summary_chunk` when a summary is shown, then `compaction_update` `completed`, `failed`, or `cancelled` (`unchanged` is sent as `completed` with `_meta.crystal.status`). Without it, a shown summary is `agent_message_chunk` whose `messageId` is the compaction id; engine notes follow the `NoteWritten` mapping above |
 | `TurnStarted`, `TurnFinished` | `_meta` on the first and last update; the prompt response |

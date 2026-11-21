@@ -143,7 +143,7 @@ internal static class StatusWidget
                     ("Total", TokenValue(status.Usage?.TotalTokenCount))
                 ]));
             blocks.Add(SectionRule("Session cache"));
-            blocks.Add(FieldGrid(StatsText.UsageRows(status.CacheUsage)));
+            blocks.Add(FieldGrid(StatsText.UsageRows(status.CacheUsage, status.CacheBreakdown)));
             var requestUsage = status.RequestUsage ?? [];
             if (requestUsage.Count == 0)
             {

@@ -73,7 +73,9 @@ internal sealed class ProviderUsageLedger
                 usage.CacheWriteTokens,
                 writes,
                 usage.UncachedInputTokens,
-                scope));
+                scope,
+                provider,
+                model));
         }
     }
 
