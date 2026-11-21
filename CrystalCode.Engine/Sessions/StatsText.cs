@@ -20,14 +20,9 @@ public static class StatsText
             Row("Tool calls", Count(report.ToolCalls)),
             Row("Days", Count(report.WindowDays)),
             Row("Earliest", When(report.Earliest)),
-            Row("Latest", When(report.Latest)),
-            Row("Input tokens", Count(report.InputTokens)),
-            Row("Output tokens", Count(report.OutputTokens)),
-            Row("Reasoning tokens", Count(report.ReasoningTokens)),
-            Row("Total tokens", Count(report.TotalTokens)),
-            Row("Average per session", Count(report.AverageTokensPerSession)),
-            Row("Median per session", Count(report.MedianTokensPerSession))
+            Row("Latest", When(report.Latest))
         };
+        lines.AddRange(TokenRows(report).Select(static row => Row(row.Label, row.Value)));
         lines.Add("Prompt cache");
         lines.AddRange(CacheRows(report).Select(static row => Row(row.Label, row.Value)));
         if (report.TopTools.Count == 0)
@@ -43,6 +38,32 @@ public static class StatsText
         return string.Join(Environment.NewLine, lines);
     }
 
+    public static IReadOnlyList<(string Label, string Value)> TokenRows(SessionStatsReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        var rows = new List<(string Label, string Value)>();
+        if (report.TokenTrackedSessions is { } tracked)
+        {
+            rows.Add(("Token sessions", $"{Count(tracked)} / {Count(report.Sessions)}"));
+        }
+
+        if (report.ReasoningTrackedSessions is { } reasoning)
+        {
+            rows.Add(("Reasoning sessions", $"{Count(reasoning)} / {Count(report.Sessions)}"));
+        }
+
+        rows.AddRange(
+        [
+            ("Input tokens", Count(report.InputTokens)),
+            ("Output tokens", Count(report.OutputTokens)),
+            ("Reasoning tokens", Count(report.ReasoningTokens)),
+            ("Total tokens", Count(report.TotalTokens)),
+            ("Average per session", Count(report.AverageTokensPerSession)),
+            ("Median per session", Count(report.MedianTokensPerSession))
+        ]);
+        return rows.AsReadOnly();
+    }
+
     public static IReadOnlyList<(string Label, string Value)> CacheRows(SessionStatsReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
@@ -51,13 +72,23 @@ public static class StatsText
         var rate = report.CacheReadRatePercent is { } percent
             ? percent.ToString("0.0", CultureInfo.InvariantCulture) + "%"
             : "--";
-        var rows = new List<(string Label, string Value)>
+        var rows = new List<(string Label, string Value)>();
+        if (report.CacheWindowDays is { } days)
         {
-            ("Tracked sessions", $"{Count(report.CacheTrackedSessions)} / {Count(report.Sessions)}"),
+            rows.Add(("Request window (days)", Count(days)));
+            rows.Add(("Tracked sessions", Count(report.CacheTrackedSessions)));
+        }
+        else
+        {
+            rows.Add(("Tracked sessions", $"{Count(report.CacheTrackedSessions)} / {Count(report.Sessions)}"));
+        }
+
+        rows.AddRange(
+        [
             ("Cache reads", Covered(Count(usage?.ReadTokens), usage?.ReadReports ?? 0, requests)),
             ("Cache writes", Covered(Count(usage?.WriteTokens), usage?.WriteReports ?? 0, requests)),
             ("Cache read rate", Covered(rate, usage?.ComparableRequests ?? 0, requests))
-        };
+        ]);
         foreach (var writes in usage?.WritesByLifetime ?? [])
         {
             rows.Add(($"  {Count(writes.LifetimeSeconds)} s lifetime",

@@ -466,7 +466,8 @@ separate library with no terminal code. The product can:
   coverage for each reported metric;
 - show saved cache reads, writes, optional write lifetimes, and a
   token-weighted cache read rate in `/stats`. The rate uses the requests
-  that report both a valid input total and a cache read count;
+  that report both a valid input total and a cache read count. A date
+  window limits cache statistics by request start time;
 - sign in to a provider with an account instead of an API key. A provider
   definition with `type` `authentication` names an authentication integration
   and lists its own models. `crystal login <provider>` and `/login` run the

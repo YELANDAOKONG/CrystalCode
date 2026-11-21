@@ -323,6 +323,7 @@ public sealed class SessionStore
         Usage = source.Usage,
         CumulativeUsage = source.CumulativeUsage,
         CacheUsage = source.CacheUsage,
+        CacheUsageSamples = source.CacheUsageSamples,
         Topic = source.Topic,
         TopicSource = source.TopicSource,
         Pursue = source.Pursue,

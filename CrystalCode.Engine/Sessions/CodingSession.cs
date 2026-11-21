@@ -1207,6 +1207,7 @@ public sealed class CodingSession : ITurnObserver
     private TurnStopReason? _lastStop;
     private readonly object _usageGate = new();
     private ProviderUsageLedger _providerUsage;
+    private SessionCacheUsage? _savedCacheUsage;
     private readonly SessionReviewContext _reviewContext = new();
     private readonly SessionLedger _ledger = new();
     private ChildSessionStore _children = new();
@@ -6464,10 +6465,11 @@ public sealed class CodingSession : ITurnObserver
         var parent = ledger.SessionId;
         var child = _childRequestId.Value;
         var scope = auxiliary ? "Auxiliary" : child is null ? "Main" : "Child";
+        var startedUtc = DateTimeOffset.UtcNow;
         return new ProviderRequestContext(
             child ?? parent,
             child is null ? null : parent,
-            usage => ledger.Record(scope, settings.Provider.Value, settings.Model, usage),
+            usage => ledger.Record(scope, settings.Provider.Value, settings.Model, usage, startedUtc),
             IsAuxiliary: auxiliary);
     }
 
@@ -7293,7 +7295,9 @@ public sealed class CodingSession : ITurnObserver
         {
             lock (_usageGate)
             {
-                _sessionStore.Save(CreateDocument());
+                var document = CreateDocument();
+                _sessionStore.Save(document);
+                Volatile.Write(ref _savedCacheUsage, document.CacheUsage);
             }
         }
     }
@@ -7337,6 +7341,7 @@ public sealed class CodingSession : ITurnObserver
             referencedMarkers = ReferencedImageMarkers(archiveSnapshot);
         }
 
+        var cache = Volatile.Read(ref _providerUsage).CacheSnapshot();
         return new SessionDocument
         {
             Id = _sessionId,
@@ -7364,7 +7369,8 @@ public sealed class CodingSession : ITurnObserver
                 ? _parentTurnUsage is not null && (_ledger.ModelCalls == 0 || _ledger.CumulativeUsage is not null)
                     ? SessionLedger.Add(_ledger.CumulativeUsage, _parentTurnUsage) : null
                 : _ledger.CumulativeUsage),
-            CacheUsage = Volatile.Read(ref _providerUsage).CacheSnapshot(),
+            CacheUsage = cache.Usage,
+            CacheUsageSamples = cache.Samples,
             Children = _children.Snapshot().ToList(),
             Topic = CurrentTopic(),
             TopicSource = TopicSourceText(),
@@ -7374,6 +7380,7 @@ public sealed class CodingSession : ITurnObserver
 
     private void BeginNewSession()
     {
+        var nextSessionId = ClaimFreshSession();
         _workspace.Access.Clear();
         var hadSessionDisablement = _settings.SessionDisabledBuiltInTools.All().Count > 0;
         _settings = _settings.WithSessionDisabledBuiltInTools(new BuiltInToolDisablement());
@@ -7381,8 +7388,9 @@ public sealed class CodingSession : ITurnObserver
         CancelAndClearSide(announce: true);
         ResetTopic(null, byOperator: false);
         Publish(new ImageHistoryInvalidated());
-        _sessionId = ClaimFreshSession();
+        _sessionId = nextSessionId;
         Volatile.Write(ref _providerUsage, new ProviderUsageLedger(_sessionId));
+        Volatile.Write(ref _savedCacheUsage, null);
         _sessionCreatedUtc = DateTimeOffset.UtcNow;
         _transcript = [new ChatMessage(ChatRole.System, CurrentSystemText())];
         lock (_archiveGate)
@@ -7650,6 +7658,7 @@ public sealed class CodingSession : ITurnObserver
     {
         if (_sessionLock is not null && string.Equals(_sessionLock.Id, id, StringComparison.Ordinal))
         {
+            SavePendingCacheUsage();
             return true;
         }
 
@@ -7658,9 +7667,28 @@ public sealed class CodingSession : ITurnObserver
             return false;
         }
 
+        try
+        {
+            SavePendingCacheUsage();
+        }
+        catch
+        {
+            claimed.Dispose();
+            throw;
+        }
+
         _sessionLock?.Dispose();
         _sessionLock = claimed;
         return true;
+    }
+
+    private void SavePendingCacheUsage()
+    {
+        if (_sessionLock is not null
+            && !ReferenceEquals(Volatile.Read(ref _savedCacheUsage), Volatile.Read(ref _providerUsage).CacheSnapshot().Usage))
+        {
+            SaveSession();
+        }
     }
 
     /// <summary>
@@ -7681,7 +7709,7 @@ public sealed class CodingSession : ITurnObserver
     private void ApplyResume(SessionDocument document)
     {
         CancelAndClearSide(announce: true);
-        ApplyDocument(document);
+        ApplyDocument(document, preserveLiveCache: string.Equals(document.Id, _sessionId, StringComparison.Ordinal));
         DiscardQueue();
         PresentResume();
     }
@@ -7699,6 +7727,7 @@ public sealed class CodingSession : ITurnObserver
 
             source = CreateDocument();
             _sessionStore.Save(source);
+            Volatile.Write(ref _savedCacheUsage, source.CacheUsage);
         }
         else if (!SessionResume.TryLoad(
                      _sessionStore,
@@ -7770,7 +7799,9 @@ public sealed class CodingSession : ITurnObserver
             {
                 if (summary.Id == currentUsage.SessionId)
                 {
-                    document.CacheUsage = currentUsage.CacheSnapshot();
+                    var cache = currentUsage.CacheSnapshot();
+                    document.CacheUsage = cache.Usage;
+                    document.CacheUsageSamples = cache.Samples;
                 }
 
                 sessions.Add(document);
@@ -7785,7 +7816,7 @@ public sealed class CodingSession : ITurnObserver
         Publish(new StatsReported(report, options.IncludeAllWorkspaces));
     }
 
-    private void ApplyDocument(SessionDocument document)
+    private void ApplyDocument(SessionDocument document, bool preserveLiveCache = false)
     {
         ArgumentNullException.ThrowIfNull(document);
         var access = (document.Access ?? []).ToArray();
@@ -7807,7 +7838,15 @@ public sealed class CodingSession : ITurnObserver
         _settings = _settings.WithSessionDisabledBuiltInTools(
             SessionMapper.ReadDisabledBuiltInTools(document.DisabledBuiltInTools));
         _sessionId = document.Id!;
-        Volatile.Write(ref _providerUsage, new ProviderUsageLedger(_sessionId, document.CacheUsage));
+        if (preserveLiveCache)
+        {
+            Volatile.Write(ref _providerUsage, Volatile.Read(ref _providerUsage).NextTurn());
+        }
+        else
+        {
+            Volatile.Write(ref _providerUsage, new ProviderUsageLedger(_sessionId, document.CacheUsage, document.CacheUsageSamples));
+            Volatile.Write(ref _savedCacheUsage, document.CacheUsage);
+        }
         _sessionCreatedUtc = document.CreatedUtc ?? DateTimeOffset.UtcNow;
         ResetTopic(
             SessionTopic.Normalize(document.Topic),

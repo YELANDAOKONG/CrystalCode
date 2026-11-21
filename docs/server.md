@@ -452,8 +452,11 @@ and `uncachedInputTokens`. The `coverage` object gives each token field's
 report count. Optional `cacheWritesByLifetime` entries carry
 `lifetimeSeconds`, `tokens`, and `reports`.
 
-`report.stats` includes `report.cacheTrackedSessions` and an optional
-`report.cacheUsage`. When present, the cache summary carries `requestCount`,
+`report.stats` token totals are nullable. `report.tokenTrackedSessions`
+and `report.reasoningTrackedSessions` give the coverage of the session totals
+and reasoning counters. `report.cacheWindowDays` is present for a cache
+request time window. `report.cacheTrackedSessions` counts sessions that
+contributed cache diagnostics. The optional `report.cacheUsage` summary carries `requestCount`,
 nullable `readTokens` and `writeTokens`, `readReports`, `writeReports`,
 `comparableRequests`, `comparableInputTokens`, `comparableReadTokens`, and
 nullable `readRatePercent`. Optional `writesByLifetime` entries carry

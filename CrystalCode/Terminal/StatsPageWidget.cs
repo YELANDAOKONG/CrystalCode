@@ -29,7 +29,7 @@ internal static class StatsPageWidget
                 Text.Empty,
                 Section("Overview", Fields(OverviewRows(report))),
                 Text.Empty,
-                Section("Tokens", Fields(TokenRows(report))),
+                Section("Tokens", Fields(StatsText.TokenRows(report))),
                 Text.Empty,
                 Section("Prompt cache", Fields(StatsText.CacheRows(report))),
                 Text.Empty,
@@ -59,16 +59,6 @@ internal static class StatsPageWidget
         ("Days", Count(report.WindowDays)),
         ("Earliest", When(report.Earliest)),
         ("Latest", When(report.Latest))
-    ];
-
-    private static IReadOnlyList<(string Label, string Value)> TokenRows(SessionStatsReport report) =>
-    [
-        ("Input", Count(report.InputTokens)),
-        ("Output", Count(report.OutputTokens)),
-        ("Reasoning", Count(report.ReasoningTokens)),
-        ("Total", Count(report.TotalTokens)),
-        ("Average / session", Count(report.AverageTokensPerSession)),
-        ("Median / session", Count(report.MedianTokensPerSession))
     ];
 
     private static Grid Fields(IReadOnlyList<(string Label, string Value)> rows)

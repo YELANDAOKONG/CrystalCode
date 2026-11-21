@@ -1946,12 +1946,14 @@ send contributes zero attempts. ChatGPT tracks its five-hour and weekly
 plan limits separately.
 
 The `/stats` Prompt cache panel totals saved cache reads, writes, and
-reported write lifetimes across the selected sessions. The cache read
-percentage uses the input and read tokens from the same requests. Tracked
-sessions and per-field request counts show how much data was available.
-Older sessions without recorded cache usage remain unknown. Resume keeps
-recorded usage, and a fork starts a separate tally for requests sent after
-forking.
+reported write lifetimes. Its cache read percentage uses the input and
+read tokens from the same requests. With `/stats 7d`, the cache panel
+includes recorded requests started in the last seven days. Older
+undated cache totals remain available in the unfiltered report.
+The Overview, Tokens, and Tools panels select sessions by update time.
+The Tokens panel shows how many selected sessions provided known totals
+or reasoning counts. Its total adds input and output, and its average and
+median use the sessions with known totals.
 
 `/statusline` does not replace `/status`. The status line is a configurable
 live summary, while `/status` remains a stable diagnostic report. Supported

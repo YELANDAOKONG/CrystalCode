@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 using CrystalCode.Plugins.Clients;
 
 namespace CrystalCode.Engine.Sessions;
@@ -8,8 +10,9 @@ internal sealed class ProviderUsageLedger
     private readonly Dictionary<(string Scope, string Provider, string Model), ProviderUsageSummary> _summaries = [];
     private readonly SessionCacheUsageLedger _sessionCache;
 
-    public ProviderUsageLedger(string sessionId, SessionCacheUsage? cacheUsage = null)
-        : this(sessionId, new SessionCacheUsageLedger(cacheUsage))
+    public ProviderUsageLedger(
+        string sessionId, SessionCacheUsage? cacheUsage = null, ImmutableList<SessionCacheUsageSample>? cacheSamples = null)
+        : this(sessionId, new SessionCacheUsageLedger(cacheUsage, cacheSamples))
     {
     }
 
@@ -23,13 +26,17 @@ internal sealed class ProviderUsageLedger
 
     public ProviderUsageLedger NextTurn() => new(SessionId, _sessionCache);
 
-    public SessionCacheUsage? CacheSnapshot() => _sessionCache.Snapshot();
+    public (SessionCacheUsage? Usage, ImmutableList<SessionCacheUsageSample>? Samples) CacheSnapshot() =>
+        _sessionCache.Snapshot();
 
-    public void Record(string scope, string provider, string model, ProviderRequestUsage usage)
+    public void Record(string scope, string provider, string model, ProviderRequestUsage usage, DateTimeOffset? startedUtc = null)
     {
         lock (_gate)
         {
             var key = (scope, provider, model);
+            var writes = usage.CacheWritesByLifetime is { Count: > 0 } reported
+                ? Array.AsReadOnly(reported.Select(value => new ProviderCacheWriteUsage(value.Key, value.Value, 1)).ToArray())
+                : null;
             var hasUsage = usage.InputTokens.HasValue || usage.OutputTokens.HasValue
                 || usage.ReasoningTokens.HasValue || usage.CacheReadTokens.HasValue || usage.CacheWriteTokens.HasValue
                 || usage.UncachedInputTokens.HasValue || usage.CacheWritesByLifetime is { Count: > 0 };
@@ -57,9 +64,10 @@ internal sealed class ProviderUsageLedger
                     coverage.CacheReadTokens + Reported(usage.CacheReadTokens),
                     coverage.CacheWriteTokens + Reported(usage.CacheWriteTokens),
                     coverage.UncachedInputTokens + Reported(usage.UncachedInputTokens)),
-                CacheWritesByLifetime = AddCacheWrites(previous.CacheWritesByLifetime, usage)
+                CacheWritesByLifetime = ProviderCacheWriteUsage.Add(previous.CacheWritesByLifetime, writes ?? [])
             };
-            _sessionCache.Record(usage);
+            _sessionCache.Record(new SessionCacheUsageSample(
+                startedUtc ?? DateTimeOffset.UtcNow, usage.InputTokens, usage.CacheReadTokens, usage.CacheWriteTokens, writes));
         }
     }
 
@@ -79,16 +87,4 @@ internal sealed class ProviderUsageLedger
         previous is null ? next : next is null ? previous : previous.Value + next.Value;
 
     private static int Reported(long? count) => count.HasValue ? 1 : 0;
-
-    private static IReadOnlyList<ProviderCacheWriteUsage> AddCacheWrites(
-        IReadOnlyList<ProviderCacheWriteUsage> previous, ProviderRequestUsage usage)
-    {
-        if (usage.CacheWritesByLifetime is not { Count: > 0 } reported)
-        {
-            return previous;
-        }
-
-        return ProviderCacheWriteUsage.Add(previous,
-            reported.Select(value => new ProviderCacheWriteUsage(value.Key, value.Value, 1)).ToArray());
-    }
 }

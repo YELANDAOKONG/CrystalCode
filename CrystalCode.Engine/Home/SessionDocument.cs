@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 using CrystalCode.Engine.Sessions;
 using CrystalCode.Engine.Tools;
 
@@ -58,6 +60,9 @@ public sealed class SessionDocument
 
     /// <summary>Cache usage reported by requests sent from this session.</summary>
     public SessionCacheUsage? CacheUsage { get; set; }
+
+    /// <summary>Dated reports used by time-limited cache statistics.</summary>
+    public ImmutableList<SessionCacheUsageSample>? CacheUsageSamples { get; set; }
 
     /// <summary>
     /// Short session name. Null means none yet; an older session has none and

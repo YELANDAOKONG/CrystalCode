@@ -581,12 +581,27 @@ internal static class CrystalWire
         writer.WriteNumber("userTurns", report.UserTurns);
         writer.WriteNumber("modelCalls", report.ModelCalls);
         writer.WriteNumber("toolCalls", report.ToolCalls);
-        writer.WriteNumber("inputTokens", report.InputTokens);
-        writer.WriteNumber("outputTokens", report.OutputTokens);
-        writer.WriteNumber("reasoningTokens", report.ReasoningTokens);
-        writer.WriteNumber("totalTokens", report.TotalTokens);
-        writer.WriteNumber("averageTokensPerSession", report.AverageTokensPerSession);
-        writer.WriteNumber("medianTokensPerSession", report.MedianTokensPerSession);
+        WriteUsageCount(writer, "inputTokens", report.InputTokens);
+        WriteUsageCount(writer, "outputTokens", report.OutputTokens);
+        WriteUsageCount(writer, "reasoningTokens", report.ReasoningTokens);
+        WriteUsageCount(writer, "totalTokens", report.TotalTokens);
+        WriteUsageCount(writer, "averageTokensPerSession", report.AverageTokensPerSession);
+        WriteUsageCount(writer, "medianTokensPerSession", report.MedianTokensPerSession);
+        if (report.TokenTrackedSessions is { } tokenSessions)
+        {
+            writer.WriteNumber("tokenTrackedSessions", tokenSessions);
+        }
+
+        if (report.ReasoningTrackedSessions is { } reasoningSessions)
+        {
+            writer.WriteNumber("reasoningTrackedSessions", reasoningSessions);
+        }
+
+        if (report.CacheWindowDays is { } cacheWindow)
+        {
+            writer.WriteNumber("cacheWindowDays", cacheWindow);
+        }
+
         writer.WriteNumber("cacheTrackedSessions", report.CacheTrackedSessions);
         if (report.CacheUsage is { } cache)
         {

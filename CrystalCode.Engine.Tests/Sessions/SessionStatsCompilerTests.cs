@@ -93,7 +93,117 @@ public sealed class SessionStatsCompilerTests
 
         Assert.Empty(next.Snapshot());
         Assert.Equal(0, Assert.Single(original.Snapshot()).CacheReadTokens);
-        Assert.Equal(0, next.CacheSnapshot()!.ReadTokens);
+        Assert.Equal(0, next.CacheSnapshot().Usage!.ReadTokens);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SideCacheUsage_SavesBeforeClearingOrResuming(bool resume)
+    {
+        ChatStreamEvent[] reply =
+        [
+            new ChatTextDelta(0, 0, ChatRole.Assistant, "done"),
+            new ChatCandidateCompleted(0, FinishReason.Stop)
+        ];
+        using var session = new HeadlessSession(new ScriptedStreamingClient(reply, reply),
+            observeRequest: context => context.ReportUsage(new ProviderRequestUsage(1, InputTokens: 100, CacheReadTokens: 60)));
+        await session.Session.StartAsync(CancellationToken.None);
+        await session.RunTurnAsync("first");
+        var source = session.ReadSaved();
+        await session.Session.SubmitAsync("/btw side", CancellationToken.None);
+        await session.Session.SideQuestionTask;
+        Assert.Equal(1, session.ReadSaved().CacheUsage!.RequestCount);
+
+        var store = new SessionStore(session.Home);
+        var command = "/clear";
+        if (resume)
+        {
+            var destination = new SessionDocument
+            {
+                Id = SessionStore.NewId(),
+                Workspace = source.Workspace,
+                Items = source.Items
+            };
+            store.Save(destination);
+            command = $"/resume {destination.Id}";
+        }
+
+        await session.Session.SubmitAsync(command, CancellationToken.None);
+
+        Assert.NotEqual(source.Id, session.Session.SessionId);
+        Assert.True(store.TryLoad(source.Id!, out var saved));
+        Assert.Equal(2, saved.CacheUsage!.RequestCount);
+        Assert.Equal(120, saved.CacheUsage.ReadTokens);
+        Assert.Equal(2, saved.CacheUsageSamples!.Count);
+    }
+
+    [Fact]
+    public void Compile_DateFiltersCacheRequestsAcrossTheSelectedWorkspaceSessions()
+    {
+        var now = new DateTimeOffset(2026, 11, 21, 5, 0, 0, TimeSpan.Zero);
+        var cutoff = now.AddDays(-7);
+        var session = new SessionDocument
+        {
+            UpdatedUtc = now,
+            CacheUsage = new SessionCacheUsage { RequestCount = 3, ReadTokens = 100 },
+            CacheUsageSamples =
+            [
+                new(cutoff.AddTicks(-1), 100, 80, null, null),
+                new(cutoff, 50, 20, null, null),
+                new(now.AddTicks(1), 100, 25, null, null)
+            ]
+        };
+        var undated = new SessionDocument
+        {
+            UpdatedUtc = now,
+            CacheUsage = new SessionCacheUsage { RequestCount = 1, ReadTokens = 40 }
+        };
+        var report = SessionStatsCompiler.Compile([session, undated], now, windowDays: 7, topTools: 5);
+
+        Assert.Equal(1, report.CacheTrackedSessions);
+        Assert.Equal(7, report.CacheWindowDays);
+        Assert.Equal(20, report.CacheUsage!.ReadTokens);
+        Assert.Equal(40m, report.CacheReadRatePercent);
+        var all = SessionStatsCompiler.Compile([session, undated], now, windowDays: null, topTools: 5);
+        Assert.Equal(140, all.CacheUsage!.ReadTokens);
+    }
+
+    [Fact]
+    public void Compile_UsesOnlyKnownSessionTotalsAndPreservesLegacySingleCalls()
+    {
+        var sessions = new[]
+        {
+            new SessionDocument
+            {
+                ModelCalls = 2,
+                CumulativeUsage = new SessionUsageDocument { InputTokenCount = 100, OutputTokenCount = 50, ReasoningTokenCount = 10 }
+            },
+            new SessionDocument
+            {
+                ModelCalls = 2,
+                Usage = new SessionUsageDocument { InputTokenCount = 900, OutputTokenCount = 100, ReasoningTokenCount = 40 }
+            },
+            new SessionDocument
+            {
+                ModelCalls = 1,
+                Usage = new SessionUsageDocument { InputTokenCount = 10, OutputTokenCount = 20 }
+            }
+        };
+
+        var report = SessionStatsCompiler.Compile(sessions, DateTimeOffset.UtcNow, windowDays: null, topTools: 5);
+
+        Assert.Equal(2, report.TokenTrackedSessions);
+        Assert.Equal(1, report.ReasoningTrackedSessions);
+        Assert.Equal(110, report.InputTokens);
+        Assert.Equal(70, report.OutputTokens);
+        Assert.Equal(10, report.ReasoningTokens);
+        Assert.Equal(180, report.TotalTokens);
+        Assert.Equal(90, report.AverageTokensPerSession);
+        Assert.Equal(90, report.MedianTokensPerSession);
+        var unknown = SessionStatsCompiler.Compile([sessions[1]], DateTimeOffset.UtcNow, null, 5);
+        Assert.Null(unknown.TotalTokens);
+        Assert.Null(unknown.AverageTokensPerSession);
     }
 
     [Fact]
@@ -133,9 +243,9 @@ public sealed class SessionStatsCompilerTests
         Assert.Equal(130, report.InputTokens);
         Assert.Equal(70, report.OutputTokens);
         Assert.Equal(10, report.ReasoningTokens);
-        Assert.Equal(210, report.TotalTokens);
-        Assert.Equal(105, report.AverageTokensPerSession);
-        Assert.Equal(105, report.MedianTokensPerSession);
+        Assert.Equal(200, report.TotalTokens);
+        Assert.Equal(100, report.AverageTokensPerSession);
+        Assert.Equal(100, report.MedianTokensPerSession);
         Assert.Equal("read", report.TopTools[0].Name);
         Assert.Equal(2, report.TopTools[0].Count);
         Assert.Equal("bash", report.TopTools[1].Name);
@@ -173,7 +283,7 @@ public sealed class SessionStatsCompilerTests
             topTools: 5);
 
         Assert.Equal(1, report.Sessions);
-        Assert.Equal(65, report.TotalTokens);
+        Assert.Equal(60, report.TotalTokens);
         Assert.Equal(7, report.WindowDays);
         Assert.Single(report.TopTools);
         Assert.Equal("read", report.TopTools[0].Name);

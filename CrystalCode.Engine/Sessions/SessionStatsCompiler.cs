@@ -34,8 +34,7 @@ internal static class SessionStatsCompiler
         var input = 0L;
         var output = 0L;
         var reasoning = 0L;
-        var cacheTrackedSessions = 0;
-        SessionCacheUsage? cacheUsage = null;
+        var reasoningTrackedSessions = 0;
         var userTurns = 0;
         var modelCalls = 0;
         var toolCalls = 0;
@@ -57,18 +56,18 @@ internal static class SessionStatsCompiler
                 toolUsage[item.Name] = toolUsage.GetValueOrDefault(item.Name) + 1;
             }
 
-            var usage = session.CumulativeUsage ?? session.Usage;
-            var sessionInput = Math.Max(0, usage?.InputTokenCount ?? 0);
-            var sessionOutput = Math.Max(0, usage?.OutputTokenCount ?? 0);
-            var sessionReasoning = Math.Max(0, usage?.ReasoningTokenCount ?? 0);
-            input += sessionInput;
-            output += sessionOutput;
-            reasoning += sessionReasoning;
-            totals.Add(sessionInput + sessionOutput + sessionReasoning);
-            if (session.CacheUsage is { RequestCount: > 0 } cache)
+            var usage = SessionMapper.ReadUsage(session.CumulativeUsage
+                ?? (session.ModelCalls == 1 ? session.Usage : null));
+            if (usage is not null)
             {
-                cacheTrackedSessions++;
-                cacheUsage = cacheUsage is null ? cache : cacheUsage.Add(cache);
+                input += usage.InputTokenCount;
+                output += usage.OutputTokenCount;
+                totals.Add(usage.TotalTokenCount);
+                if (usage.ReasoningTokenCount is { } reasoned)
+                {
+                    reasoning += reasoned;
+                    reasoningTrackedSessions++;
+                }
             }
 
             var timestamp = session.UpdatedUtc ?? session.CreatedUtc;
@@ -82,15 +81,16 @@ internal static class SessionStatsCompiler
         }
 
         totals.Sort();
-        var median = totals.Count switch
+        long? median = totals.Count switch
         {
-            0 => 0L,
+            0 => null,
             _ when totals.Count % 2 == 1 => totals[totals.Count / 2],
-            _ => (totals[totals.Count / 2] + totals[(totals.Count / 2) - 1]) / 2
+            _ => totals[(totals.Count / 2) - 1]
+                + (totals[totals.Count / 2] - totals[(totals.Count / 2) - 1]) / 2
         };
         var sessionsCount = considered.Count;
-        var total = input + output + reasoning;
-        var average = sessionsCount == 0 ? 0 : total / sessionsCount;
+        long? total = totals.Count == 0 ? null : input + output;
+        var average = totals.Count == 0 ? null : total / totals.Count;
         var top = toolUsage
             .OrderByDescending(static pair => pair.Value)
             .ThenBy(static pair => pair.Key, StringComparer.Ordinal)
@@ -101,14 +101,15 @@ internal static class SessionStatsCompiler
             ?? (earliest is not null && latest is not null
                 ? Math.Max(1, (int)Math.Ceiling((latest.Value - earliest.Value).TotalDays))
                 : 0);
+        var (cacheTrackedSessions, cacheUsage) = CompileCache(sessions, cutoff, now);
         return new SessionStatsReport(
             sessionsCount,
             userTurns,
             modelCalls,
             toolCalls,
-            input,
-            output,
-            reasoning,
+            totals.Count == 0 ? null : input,
+            totals.Count == 0 ? null : output,
+            reasoningTrackedSessions == 0 ? null : reasoning,
             total,
             average,
             median,
@@ -117,8 +118,41 @@ internal static class SessionStatsCompiler
             latest,
             top)
         {
+            TokenTrackedSessions = totals.Count,
+            ReasoningTrackedSessions = reasoningTrackedSessions,
             CacheTrackedSessions = cacheTrackedSessions,
+            CacheWindowDays = windowDays,
             CacheUsage = cacheUsage
         };
+    }
+
+    private static (int TrackedSessions, SessionCacheUsage? Usage) CompileCache(
+        IReadOnlyList<SessionDocument> sessions, DateTimeOffset? cutoff, DateTimeOffset now)
+    {
+        var trackedSessions = 0;
+        SessionCacheUsage? usage = null;
+        foreach (var session in sessions)
+        {
+            var cache = session.CacheUsage;
+            if (cutoff is { } start)
+            {
+                cache = null;
+                foreach (var sample in session.CacheUsageSamples ?? [])
+                {
+                    if (sample.StartedUtc >= start && sample.StartedUtc <= now)
+                    {
+                        cache = (cache ?? new SessionCacheUsage()).Add(sample);
+                    }
+                }
+            }
+
+            if (cache is { RequestCount: > 0 })
+            {
+                trackedSessions++;
+                usage = usage is null ? cache : usage.Add(cache);
+            }
+        }
+
+        return (trackedSessions, usage);
     }
 }

@@ -2568,19 +2568,24 @@ failed token lookup or refresh before the first send contributes zero. A
 JSON error body returned in place of an event stream still contributes
 the usage fields it supplies.
 
-`/stats` reads the cache totals saved with each session and groups them
-over the existing workspace and day scope. Each request contributes once
-to its turn's diagnostics and to its originating session's cache totals.
+`/stats` reads cache totals saved with each session. Each request contributes
+once to its turn's diagnostics and to its originating session's cache totals.
 This includes any reported child or auxiliary requests. A delayed report
 stays attached to the session that sent the request. Checkpoints and session
-saves retain these totals, and stats can use the live totals for its active
-saved session. Resuming restores the totals. A fork accumulates its own
-requests, while the source retains the cache usage from inherited history.
-Old session files without cache data have unknown cache usage. The cache
-read rate divides read tokens by input tokens on the same requests with
-valid counts. Per-field coverage counts and the number of tracked sessions
-describe the scope. Cache totals are a separate breakdown of the requests'
-input tokens.
+saves retain the totals and dated samples. Before releasing an active session
+claim, the host saves any newly reported cache usage. Stats can use live
+totals and samples for the active saved session. Resuming restores the totals
+and a fork collects usage for its own requests. Previously saved cache totals
+without samples contribute to the unfiltered report. A day window uses
+request start times in the selected workspace scope. The read rate divides
+read tokens by input tokens on the same requests with valid counts.
+
+The Overview, Tokens, and Tools sections retain the existing session date
+filter. The token section uses known session totals, including a saved
+single-request count for a legacy single-call session. The total is input
+plus output, with reasoning shown separately as part of output. Average
+and median use the sessions with known totals. Separate coverage counts
+show how many selected sessions supplied totals and reasoning.
 
 Operator plugins live under `plugins/`. A project directory of the same
 name replaces the home plugin as a whole. `plugin.json` field `enabled`
